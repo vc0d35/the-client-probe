@@ -14,7 +14,11 @@
     <script type="module">
       import * as theClientProbe from "../src/index.js";
 
-      theClientProbe.scanPorts();
+      console.log('array of ports');
+      theClientProbe.scanPorts([80, 443, 1800, 8080]);
+
+      console.log('min max');
+      theClientProbe.scanPorts(3000, 4000);
     </script>
   </body>
 </html>

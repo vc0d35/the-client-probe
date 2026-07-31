@@ -1,26 +1,32 @@
 {
-  "name": "the-client-probe",
-  "version": "0.1.0",
-  "description": "A JavaScript client-side port scanner",
-  "type": "module",
-  "main": "./src/index.js",
-  "module": "./src/index.js",
-  "types": "./src/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./src/index.d.ts",
-      "import": "./src/index.js",
-      "default": "./src/index.js"
-    },
-    "./package.json": "./package.json"
-  },
-  "files": [
-    "src",
-    "README.md"
-  ],
-  "sideEffects": false,
-  "scripts": {
-    "example": "npx --yes http-server . -o /example/index.html"
-  },
-  "license": "MIT"
+	"name": "the-client-probe",
+	"version": "0.1.0",
+	"description": "A JavaScript client-side port scanner",
+	"type": "module",
+	"main": "./src/index.js",
+	"module": "./src/index.js",
+	"types": "./src/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.d.ts",
+			"import": "./src/index.js",
+			"default": "./src/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"src",
+		"README.md"
+	],
+	"sideEffects": false,
+	"scripts": {
+		"example": "npx --yes http-server . -o /example/index.html",
+		"test": "node --test",
+		"lint": "biome check .",
+		"format": "biome format --write ."
+	},
+	"license": "MIT",
+	"devDependencies": {
+		"@biomejs/biome": "2.5.6"
+	}
 }
