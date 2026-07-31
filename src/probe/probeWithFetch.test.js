@@ -1,0 +1,28 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { PortState, probeWithFetch } from "../index.js";
+
+test("probeWithFetch classifies a resolved fetch as open", async () => {
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = async (url, options) => {
+		assert.equal(url, "http://127.0.0.1:8080/");
+		assert.equal(options.mode, "no-cors");
+		return {};
+	};
+
+	try {
+		const result = await probeWithFetch("127.0.0.1", 8080);
+		assert.deepEqual(
+			{ host: result.host, port: result.port, state: result.state },
+			{
+				host: "127.0.0.1",
+				port: 8080,
+				state: PortState.Open,
+			},
+		);
+		assert.equal(typeof result.durationMs, "number");
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});

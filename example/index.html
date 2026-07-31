@@ -14,11 +14,11 @@
     <script type="module">
       import * as theClientProbe from "../src/index.js";
 
-      console.log('array of ports');
-      theClientProbe.scanPorts([80, 443, 1800, 8080]);
+      const host = '127.0.0.1';
 
-      console.log('min max');
-      theClientProbe.scanPorts(3000, 4000);
+      const test1 = await theClientProbe.scanPorts(host, [80, 443, 1800, 8080, 8870, 8777, 3010]);
+
+      console.log(test1);
     </script>
   </body>
 </html>

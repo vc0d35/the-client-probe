@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseArgs } from "../src/utils/parseArgs.js";
+import { parseArgs } from "./parseArgs.js";
 
 test("parses explicit ports and inclusive ranges", () => {
 	assert.deepEqual(parseArgs([80, 443]), [80, 443]);
@@ -15,6 +15,8 @@ test("rejects invalid port arguments", () => {
 	assert.throws(() => parseArgs([80, 443.5]), RangeError);
 	assert.throws(() => parseArgs(443, 80), RangeError);
 	assert.throws(() => parseArgs([80], 443), TypeError);
+	// @ts-ignore Ignoring this in TS-world so IDEs don't complain about this line
 	assert.throws(() => parseArgs(), TypeError);
+	// @ts-ignore Ignoring this in TS-world so IDEs don't complain about this line
 	assert.throws(() => parseArgs("80"), TypeError);
 });
