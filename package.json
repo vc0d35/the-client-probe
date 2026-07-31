@@ -19,5 +19,8 @@
     "README.md"
   ],
   "sideEffects": false,
+  "scripts": {
+    "example": "npx --yes http-server . -o /example/index.html"
+  },
   "license": "MIT"
 }

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Client Probe</title>
+  </head>
+  <body>
+    <main>
+      <h1>The Client Probe</h1>
+      <div id="result"></div>
+    </main>
+
+    <script type="module">
+      import * as theClientProbe from "../src/index.js";
+
+      theClientProbe.scanPorts();
+    </script>
+  </body>
+</html>
