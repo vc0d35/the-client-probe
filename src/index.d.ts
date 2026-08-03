@@ -18,6 +18,11 @@ export declare function probeWithFetch(
 	port: number,
 ): Promise<ProbeResult>;
 
+export declare function probeWithIce(
+	host: string,
+	port: number,
+): Promise<ProbeResult>;
+
 export declare function scanPorts(
 	host: string,
 	ports: readonly number[],
