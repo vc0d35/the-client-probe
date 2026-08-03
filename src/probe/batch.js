@@ -1,10 +1,19 @@
 import { probeWithFetch } from "./probeWithFetch.js";
+import { probeWithIce } from "./probeWithIce.js";
 
 const BATCH_SIZE = 128;
 
 /**
  * @typedef {{host: string, port: number, state: string, durationMs: number}} ProbeResult
  */
+
+/**
+ * Route each port to the best channel for it: fetch below 1024 (ICE won't work for them),
+ * ICE above.
+ */
+function probePort(host, port) {
+	return port >= 1024 ? probeWithIce(host, port) : probeWithFetch(host, port);
+}
 
 /**
  * @param {string} host Hostname or IP literal.
@@ -15,9 +24,7 @@ async function probeBatchList(host, batches) {
 	const [batch, ...remainingBatches] = batches;
 	if (!batch) return [];
 
-	const results = await Promise.all(
-		batch.map((port) => probeWithFetch(host, port)),
-	);
+	const results = await Promise.all(batch.map((port) => probePort(host, port)));
 	return [...results, ...(await probeBatchList(host, remainingBatches))];
 }
 
