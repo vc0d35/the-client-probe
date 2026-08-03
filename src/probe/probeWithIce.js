@@ -69,7 +69,7 @@ async function candidatePair(connection) {
  * @param {string} host Hostname or IP literal.
  * @param {number} port TCP/UDP port number, 1024–65535.
  * @param {"tcp"|"udp"} [protocol="tcp"] Transport to probe.
- * @returns {Promise<{host: string, port: number, state: string, durationMs: number}>}
+ * @returns {Promise<{host: string, port: number, protocol: string, state: string, durationMs: number}>}
  */
 export async function probeWithIce(host, port, protocol = "tcp") {
 	if (typeof RTCPeerConnection === "undefined") {
@@ -100,13 +100,20 @@ export async function probeWithIce(host, port, protocol = "tcp") {
 			await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 			const state = classify(await candidatePair(connection));
 			if (state) {
-				return { host, port, state, durationMs: performance.now() - started };
+				return {
+					host,
+					port,
+					protocol,
+					state,
+					durationMs: performance.now() - started,
+				};
 			}
 		}
 
 		return {
 			host,
 			port,
+			protocol,
 			state: timeoutState,
 			durationMs: performance.now() - started,
 		};

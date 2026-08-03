@@ -5,7 +5,7 @@ export { PortState, probeWithFetch } from "./probe/probeWithFetch.js";
 export { probeWithIce } from "./probe/probeWithIce.js";
 
 /**
- * @typedef {{host: string, port: number, state: string, durationMs: number}} ProbeResult
+ * @typedef {{host: string, port: number, protocol: string, state: string, durationMs: number}} ProbeResult
  */
 
 /**

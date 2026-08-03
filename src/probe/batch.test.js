@@ -42,18 +42,26 @@ test("probeBatches routes low ports to fetch and high ports to ICE", async () =>
 			return {};
 		},
 		async () => {
-			await withFakePeerConnection({ requestsSent: 1 }, async () => {
-				const results = await probeBatches("127.0.0.1", [80, 8080]);
+			await withFakePeerConnection(
+				{ requestsSent: 1, responsesReceived: 1 },
+				async () => {
+					const results = await probeBatches("127.0.0.1", [80, 8080]);
 
-				assert.deepEqual(fetchUrls, ["http://127.0.0.1:80/"]);
-				assert.deepEqual(
-					results.map(({ port, state }) => ({ port, state })),
-					[
-						{ port: 80, state: PortState.Open },
-						{ port: 8080, state: PortState.Open },
-					],
-				);
-			});
+					assert.deepEqual(fetchUrls, ["http://127.0.0.1:80/"]);
+					assert.deepEqual(
+						results.map(({ port, protocol, state }) => ({
+							port,
+							protocol,
+							state,
+						})),
+						[
+							{ port: 80, protocol: "tcp", state: PortState.Open },
+							{ port: 8080, protocol: "tcp", state: PortState.OpenStun },
+							{ port: 8080, protocol: "udp", state: PortState.OpenStun },
+						],
+					);
+				},
+			);
 		},
 	);
 });

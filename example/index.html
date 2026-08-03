@@ -28,7 +28,12 @@
         color: #e5c07b;
       }
 
-      .closed {
+      .open-stun {
+        color: #61afef;
+      }
+
+      .closed,
+      .unknown {
         color: #5c6370;
       }
     </style>
@@ -49,10 +54,10 @@
       results.sort((a, b) => a.port - b.port);
 
       document.querySelector("#result").innerHTML = results
-        .map(({ port, state, durationMs }) => {
+        .map(({ port, protocol, state, durationMs }) => {
           const target = `${host}:${port}`.padEnd(20);
           const ms = `${Math.round(durationMs)} ms`;
-          return `<div class="${state}">${target} ${state.padEnd(11)} ${ms}</div>`;
+          return `<div class="${state}">${target} ${protocol.padEnd(4)} ${state.padEnd(11)} ${ms}</div>`;
         })
         .join("");
     </script>

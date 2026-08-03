@@ -20,7 +20,7 @@ export const PortState = Object.freeze({
  *
  * @param {string} host Hostname or IP literal.
  * @param {number} port TCP port number.
- * @returns {Promise<{host: string, port: number, state: string, durationMs: number}>}
+ * @returns {Promise<{host: string, port: number, protocol: string, state: string, durationMs: number}>}
  */
 export async function probeWithFetch(host, port) {
 	const controller = new AbortController();
@@ -41,6 +41,7 @@ export async function probeWithFetch(host, port) {
 		return {
 			host,
 			port,
+			protocol: "tcp",
 			state: PortState.Open,
 			durationMs: performance.now() - started,
 		};
@@ -48,6 +49,7 @@ export async function probeWithFetch(host, port) {
 		return {
 			host,
 			port,
+			protocol: "tcp",
 			state: timedOut ? PortState.OpenSilent : PortState.Closed,
 			durationMs: performance.now() - started,
 		};

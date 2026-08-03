@@ -4,15 +4,22 @@ import { probeWithIce } from "./probeWithIce.js";
 const BATCH_SIZE = 128;
 
 /**
- * @typedef {{host: string, port: number, state: string, durationMs: number}} ProbeResult
+ * @typedef {{host: string, port: number, protocol: string, state: string, durationMs: number}} ProbeResult
  */
 
 /**
- * Route each port to the best channel for it: fetch below 1024 (ICE won't work for them),
- * ICE above.
+ * Route each port to the best channels for it: fetch (TCP) below 1024
+ * (libwebrtc rejects ICE candidates to low ports on local addresses), ICE
+ * over both TCP and UDP above. Returns one result per transport.
  */
-function probePort(host, port) {
-	return port >= 1024 ? probeWithIce(host, port) : probeWithFetch(host, port);
+async function probePort(host, port) {
+	if (port < 1024) {
+		return [await probeWithFetch(host, port)];
+	}
+	return Promise.all([
+		probeWithIce(host, port, "tcp"),
+		probeWithIce(host, port, "udp"),
+	]);
 }
 
 /**
@@ -25,11 +32,12 @@ async function probeBatchList(host, batches) {
 	if (!batch) return [];
 
 	const results = await Promise.all(batch.map((port) => probePort(host, port)));
-	return [...results, ...(await probeBatchList(host, remainingBatches))];
+	return [...results.flat(), ...(await probeBatchList(host, remainingBatches))];
 }
 
 /**
  * Probe ports in bounded batches while preserving their input order.
+ * Ports >= 1024 yield two results each (TCP then UDP).
  *
  * @param {string} host Hostname or IP literal.
  * @param {readonly number[]} ports Ports to probe.

@@ -16,6 +16,7 @@ export const PortState: {
 export interface ProbeResult {
 	host: string;
 	port: number;
+	protocol: "tcp" | "udp";
 	state: PortStateValue;
 	durationMs: number;
 }
