@@ -1,9 +1,16 @@
-export type PortStateValue = "open" | "open-silent" | "closed";
+export type PortStateValue =
+	| "open"
+	| "open-silent"
+	| "closed"
+	| "open-stun"
+	| "unknown";
 
 export const PortState: {
 	readonly Open: "open";
 	readonly OpenSilent: "open-silent";
 	readonly Closed: "closed";
+	readonly OpenStun: "open-stun";
+	readonly Unknown: "unknown";
 };
 
 export interface ProbeResult {
@@ -21,6 +28,7 @@ export declare function probeWithFetch(
 export declare function probeWithIce(
 	host: string,
 	port: number,
+	protocol?: "tcp" | "udp",
 ): Promise<ProbeResult>;
 
 export declare function scanPorts(
