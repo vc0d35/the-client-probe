@@ -2,6 +2,7 @@ import { probeBatches } from "./probe/batch.js";
 import { parseArgs } from "./utils/parseArgs.js";
 
 export { PortState, probeWithFetch } from "./probe/probeWithFetch.js";
+export { probeWithIce } from "./probe/probeWithIce.js";
 
 /**
  * @typedef {{host: string, port: number, state: string, durationMs: number}} ProbeResult
