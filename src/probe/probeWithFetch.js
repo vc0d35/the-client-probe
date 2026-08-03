@@ -1,12 +1,14 @@
 const FETCH_TIMEOUT_MS = 2000;
 
 /**
- * Port states observable from a fetch-based probe.
+ * Port states observable from a probe.
  */
 export const PortState = Object.freeze({
 	Open: "open",
 	OpenSilent: "open-silent",
 	Closed: "closed",
+	OpenStun: "open-stun",
+	Unknown: "unknown",
 });
 
 /**
