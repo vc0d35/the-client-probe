@@ -2,57 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { PortState, probeWithIce } from "../index.js";
-
-/**
- * Install a fake RTCPeerConnection whose getStats() reports the given
- * candidate-pair traffic, run `fn`, then restore the global.
- */
-async function withFakePeerConnection({ requestsSent }, fn) {
-	const instances = [];
-	const original = globalThis.RTCPeerConnection;
-
-	globalThis.RTCPeerConnection = class {
-		constructor() {
-			this.localDescription = null;
-			this.remoteDescription = null;
-			this.closed = false;
-			instances.push(this);
-		}
-
-		createDataChannel() {}
-
-		async createOffer() {
-			return { type: "offer", sdp: "v=0\r\na=mid:0\r\n" };
-		}
-
-		async setLocalDescription(description) {
-			this.localDescription = description;
-		}
-
-		async setRemoteDescription(description) {
-			this.remoteDescription = description;
-		}
-
-		async getStats() {
-			return new Map([
-				[
-					"pair",
-					{ type: "candidate-pair", requestsSent, responsesReceived: 0 },
-				],
-			]);
-		}
-
-		close() {
-			this.closed = true;
-		}
-	};
-
-	try {
-		return await fn(instances);
-	} finally {
-		globalThis.RTCPeerConnection = original;
-	}
-}
+import { withFakePeerConnection } from "../testing/mockPeerConnection.js";
 
 test("probeWithIce classifies candidate-pair traffic as open", async () => {
 	await withFakePeerConnection({ requestsSent: 1 }, async (instances) => {
