@@ -4,21 +4,57 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>The Client Probe</title>
+    <style>
+      body {
+        background: #121418;
+        color: #e6e6e6;
+        font-family: ui-monospace, monospace;
+        padding: 2rem;
+      }
+
+      h1 {
+        font-size: 1.2rem;
+      }
+
+      #result {
+        white-space: pre;
+      }
+
+      .open {
+        color: #6fdc8c;
+      }
+
+      .open-silent {
+        color: #e5c07b;
+      }
+
+      .closed {
+        color: #5c6370;
+      }
+    </style>
   </head>
   <body>
     <main>
       <h1>The Client Probe</h1>
-      <div id="result"></div>
+      <div id="result">scanning…</div>
     </main>
 
     <script type="module">
       import * as theClientProbe from "../src/index.js";
 
-      const host = '127.0.0.1';
+      const host = "127.0.0.1";
+      const ports = [80, 443, 1800, 8080, 8870, 8777, 3010];
 
-      const test1 = await theClientProbe.scanPorts(host, [80, 443, 1800, 8080, 8870, 8777, 3010]);
+      const results = await theClientProbe.scanPorts(host, ports);
+      results.sort((a, b) => a.port - b.port);
 
-      console.log(test1);
+      document.querySelector("#result").innerHTML = results
+        .map(({ port, state, durationMs }) => {
+          const target = `${host}:${port}`.padEnd(20);
+          const ms = `${Math.round(durationMs)} ms`;
+          return `<div class="${state}">${target} ${state.padEnd(11)} ${ms}</div>`;
+        })
+        .join("");
     </script>
   </body>
 </html>
