@@ -8,8 +8,8 @@ const BATCH_SIZE = 128;
  */
 
 /**
- * Route each port to the best channel for it: fetch below 1024 (ICE won't work for them),
- * ICE above.
+ * Route each port to the best channel for it: fetch below 1024 (ICE won't
+ * work for them), ICE above.
  */
 function probePort(host, port) {
 	return port >= 1024 ? probeWithIce(host, port) : probeWithFetch(host, port);

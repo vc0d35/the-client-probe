@@ -30,26 +30,3 @@ test("probeWithIce classifies no traffic as closed", async () => {
 		assert.ok(result.durationMs >= 2000, "waits out the full timeout");
 	});
 });
-
-test("probeWithIce udp: classifies a STUN reply as open-stun", async () => {
-	await withFakePeerConnection(
-		{ requestsSent: 1, responsesReceived: 1 },
-		async (instances) => {
-			const result = await probeWithIce("127.0.0.1", 3478, "udp");
-
-			assert.equal(result.state, PortState.OpenStun);
-			assert.match(
-				instances[0].remoteDescription.sdp,
-				/a=candidate:1 1 udp 2130706431 127\.0\.0\.1 3478 typ host/,
-			);
-		},
-	);
-});
-
-test("probeWithIce udp: classifies no STUN reply as unknown", async () => {
-	await withFakePeerConnection({ requestsSent: 1 }, async () => {
-		const result = await probeWithIce("127.0.0.1", 3478, "udp");
-
-		assert.equal(result.state, PortState.Unknown);
-	});
-});

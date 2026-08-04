@@ -7,8 +7,6 @@ export const PortState = Object.freeze({
 	Open: "open",
 	OpenSilent: "open-silent",
 	Closed: "closed",
-	OpenStun: "open-stun",
-	Unknown: "unknown",
 });
 
 /**

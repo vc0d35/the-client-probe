@@ -1,14 +1,10 @@
 /**
  * @param {object} [options]
  * @param {number} [options.requestsSent=0] requestsSent on the fake pair.
- * @param {number} [options.responsesReceived=0] responsesReceived on it.
  * @param {(instances: object[]) => Promise<unknown>} fn The test body; gets
  *   every created fake instance for inspection.
  */
-export async function withFakePeerConnection(
-	{ requestsSent = 0, responsesReceived = 0 } = {},
-	fn,
-) {
+export async function withFakePeerConnection({ requestsSent = 0 } = {}, fn) {
 	const instances = [];
 	const original = globalThis.RTCPeerConnection;
 
@@ -36,7 +32,7 @@ export async function withFakePeerConnection(
 
 		async getStats() {
 			return new Map([
-				["pair", { type: "candidate-pair", requestsSent, responsesReceived }],
+				["pair", { type: "candidate-pair", requestsSent }],
 			]);
 		}
 
