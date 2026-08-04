@@ -1,6 +1,5 @@
 import { PortState } from "./probeWithFetch.js";
 
-const ICE_TIMEOUT_MS = 2000;
 const POLL_INTERVAL_MS = 100;
 
 /**
@@ -52,8 +51,17 @@ async function startChecks(host, ports) {
 }
 
 /**
- * Collect per-port traffic from the connection's stats: for every
- * candidate pair that carried STUN requests, record the target port.
+ * Collect per-port connect evidence from the connection's stats: only a
+ * candidate pair that actually SENT STUN traffic proves the connect
+ * succeeded. Pair existence alone is NOT sufficient — pairs whose socket
+ * was never created (restricted ports, or P2P socket-pool exhaustion when
+ * hundreds of connects fire at once) linger in "waiting" state forever,
+ * and would be false positives (measured: a full sweep marked ~1300
+ * phantom ports open, including every restricted port).
+ *
+ * Traffic is paced (one new check per ~48 ms tick, kWeakPingInterval in
+ * p2p/base/p2p_constants.h), so the batch deadline must scale with the
+ * number of candidates — see adaptiveTimeoutMs below.
  */
 async function collectReachablePorts(connection, reachable) {
 	const stats = await connection.getStats();
@@ -76,13 +84,23 @@ async function collectReachablePorts(connection, reachable) {
 }
 
 /**
+ * Chromium paces ICE-TCP checks to ~65 ms per candidate per
+ * RTCPeerConnection (kWeakPingInterval = 48 ms plus per-tick overhead;
+ * measured on Chrome 150 / macOS: 64 candidates → last check at ~4.1 s).
+ * A batch's deadline must cover pacing for every candidate or late-paced
+ * open ports are misclassified as closed.
+ */
+const adaptiveTimeoutMs = (portCount) => portCount * 100 + 500;
+
+/**
  * Probe one TCP port with a WebRTC ICE connectivity check.
  *
  * The port is planted as a remote ICE candidate; Chromium then opens a real
- * TCP connection to it and writes STUN bytes. If any candidate pair shows
- * requestsSent > 0, the connection was accepted — the port is open, no
- * matter what protocol the service speaks (HTTP, SSH, CORP-protected, ...).
- * If no traffic appears before the timeout, the port is closed.
+ * TCP connection to it and, once the paced check for that pair fires,
+ * writes STUN bytes. If any candidate pair shows requestsSent > 0, the
+ * connection was accepted — the port is open, no matter what protocol the
+ * service speaks (HTTP, SSH, CORP-protected, ...). If no traffic appears
+ * before the timeout, the port is closed.
  *
  * Unlike probeWithFetch this observes connect success directly, so it is
  * immune to CORP/ORB and non-HTTP responses — but it needs one
@@ -92,11 +110,11 @@ async function collectReachablePorts(connection, reachable) {
  *
  * @param {string} host Hostname or IP literal.
  * @param {number} port TCP port number, 1024–65535.
- * @param {number} [timeoutMs=2000] How long to wait for traffic before
- *   classifying as closed. 500 ms is safe on loopback.
+ * @param {number} [timeoutMs] How long to wait for traffic before
+ *   classifying as closed. Default: adaptive to batch size.
  * @returns {Promise<{host: string, port: number, state: string, durationMs: number}>}
  */
-export async function probeWithIce(host, port, timeoutMs = ICE_TIMEOUT_MS) {
+export async function probeWithIce(host, port, timeoutMs) {
 	const [result] = await probeBatchWithIce(host, [port], timeoutMs);
 	return result;
 }
@@ -107,33 +125,38 @@ export async function probeWithIce(host, port, timeoutMs = ICE_TIMEOUT_MS) {
  * This amortizes the connection setup and, crucially, the closed-port
  * timeout: a batch of closed ports costs one timeout, not one per port.
  *
- * Verified on Chrome 150 / macOS: pairs for open ports show requestsSent
- * within ~300 ms even with 64 candidates; refused ports never produce one.
+ * The oracle is STUN traffic on the pair (requestsSent > 0): TCP connects
+ * fire eagerly and refused connects destroy their pair, while blocked or
+ * exhausted sockets leave pairs pending forever — so only an actual check
+ * having been sent proves the port open. Note that a silently filtered
+ * port (SYN dropped, no RST) never produces traffic either, so "closed"
+ * means refused-or-filtered. On loopback and typical LANs there is no
+ * filtering, so this is exact.
  *
  * @param {string} host Hostname or IP literal.
  * @param {readonly number[]} ports TCP ports, each 1024–65535.
- * @param {number} [timeoutMs=2000] Per-batch deadline; "closed" is an
+ * @param {number} [timeoutMs] Per-batch deadline; "closed" is an
  *   absence-of-traffic verdict, so this bounds every closed port in the
- *   batch. 500 ms is safe on loopback; use ~1000 ms for LAN targets.
+ *   batch. Default is adaptive — ports.length * 100 + 500 ms — because
+ *   Chromium paces ICE-TCP checks (~65 ms/candidate) and a shorter
+ *   deadline silently misclassifies late-paced open ports as closed.
+ *   Shorter explicit values are only safe for small batches.
  * @returns {Promise<{host: string, port: number, state: string, durationMs: number}[]>}
  */
-export async function probeBatchWithIce(
-	host,
-	ports,
-	timeoutMs = ICE_TIMEOUT_MS,
-) {
+export async function probeBatchWithIce(host, ports, timeoutMs) {
 	if (typeof RTCPeerConnection === "undefined") {
 		throw new Error(
 			"probeBatchWithIce requires a browser with RTCPeerConnection",
 		);
 	}
 
+	const deadline = timeoutMs ?? adaptiveTimeoutMs(ports.length);
 	const started = performance.now();
 	const connection = await startChecks(host, ports);
 
 	try {
 		const reachable = new Set();
-		const deadlineAt = started + timeoutMs;
+		const deadlineAt = started + deadline;
 		while (reachable.size < ports.length && performance.now() < deadlineAt) {
 			await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 			await collectReachablePorts(connection, reachable);
