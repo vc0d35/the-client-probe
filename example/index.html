@@ -60,7 +60,6 @@
 
       await theClientProbe.scanPorts(host, 1, 65535, {
         fetchTimeoutMs: 500,
-        iceTimeoutMs: 500,
         onProgress({ completed, total, result: probeResult }) {
           progress.textContent = `scanned ${completed} / ${total} ports`;
           if (probeResult.state !== "closed") {

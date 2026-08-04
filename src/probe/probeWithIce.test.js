@@ -30,6 +30,6 @@ test("probeWithIce classifies no traffic as closed", async () => {
 		const result = await probeWithIce("127.0.0.1", 8080);
 
 		assert.equal(result.state, PortState.Closed);
-		assert.ok(result.durationMs >= 2000, "waits out the full timeout");
+		assert.ok(result.durationMs >= 600, "waits out the adaptive timeout");
 	});
 });
