@@ -32,11 +32,19 @@ export declare function probeBatchWithIce(
 	timeoutMs?: number,
 ): Promise<ProbeResult[]>;
 
+export interface ScanProgress {
+	completed: number;
+	total: number;
+	result: ProbeResult;
+}
+
 export interface ScanOptions {
 	/** Hang timeout for fetch probes (ports < 1024). Default 2000. */
 	fetchTimeoutMs?: number;
 	/** Per-batch deadline for ICE probes (ports >= 1024). Default 2000. */
 	iceTimeoutMs?: number;
+	/** Called as each probe settles. */
+	onProgress?: (progress: ScanProgress) => void;
 }
 
 export declare function scanPorts(

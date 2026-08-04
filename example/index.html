@@ -20,6 +20,10 @@
         white-space: pre;
       }
 
+      #progress {
+        color: #888;
+      }
+
       .open {
         color: #6fdc8c;
       }
@@ -36,25 +40,37 @@
   <body>
     <main>
       <h1>The Client Probe</h1>
-      <div id="result">scanning…</div>
+      <div id="progress">starting…</div>
+      <div id="result"></div>
     </main>
 
     <script type="module">
       import * as theClientProbe from "../src/index.js";
 
       const host = "127.0.0.1";
-      const ports = [80, 443, 1800, 8080, 8870, 8777, 3010];
+      const progress = document.querySelector("#progress");
+      const result = document.querySelector("#result");
+      const found = [];
 
-      const results = await theClientProbe.scanPorts(host, ports);
-      results.sort((a, b) => a.port - b.port);
+      const renderRow = ({ port, state, durationMs }) => {
+        const target = `${host}:${port}`.padEnd(20);
+        const ms = `${Math.round(durationMs)} ms`;
+        return `<div class="${state}">${target} ${state.padEnd(11)} ${ms}</div>`;
+      };
 
-      document.querySelector("#result").innerHTML = results
-        .map(({ port, state, durationMs }) => {
-          const target = `${host}:${port}`.padEnd(20);
-          const ms = `${Math.round(durationMs)} ms`;
-          return `<div class="${state}">${target} ${state.padEnd(11)} ${ms}</div>`;
-        })
-        .join("");
+      await theClientProbe.scanPorts(host, 1, 65535, {
+        fetchTimeoutMs: 500,
+        iceTimeoutMs: 500,
+        onProgress({ completed, total, result: probeResult }) {
+          progress.textContent = `scanned ${completed} / ${total} ports`;
+          if (probeResult.state !== "closed") {
+            found.push(probeResult);
+            result.innerHTML = found.map(renderRow).join("");
+          }
+        },
+      });
+
+      progress.textContent = "done";
     </script>
   </body>
 </html>
