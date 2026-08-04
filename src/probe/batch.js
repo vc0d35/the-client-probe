@@ -43,9 +43,21 @@ async function runPool(items, concurrency, task) {
  * @param {object} [options]
  * @param {number} [options.fetchTimeoutMs] Forwarded to probeWithFetch.
  * @param {number} [options.iceTimeoutMs] Forwarded to probeBatchWithIce.
+ * @param {(progress: {completed: number, total: number, result: ProbeResult}) => void} [options.onProgress]
+ *   Called as each probe settles — fetch probes report individually, ICE
+ *   probes report when their 64-port batch completes.
  * @returns {Promise<ProbeResult[]>} Results in the same order as `ports`.
  */
 export async function probeBatches(host, ports, options = {}) {
+	const { fetchTimeoutMs, iceTimeoutMs, onProgress } = options;
+	const total = ports.length;
+	let completed = 0;
+	const track = (result) => {
+		completed += 1;
+		onProgress?.({ completed, total, result });
+		return result;
+	};
+
 	const lowPorts = [];
 	const highPorts = [];
 	for (const port of ports) {
@@ -59,11 +71,11 @@ export async function probeBatches(host, ports, options = {}) {
 	);
 
 	const [lowResults, highResults] = await Promise.all([
-		runPool(lowPorts, FETCH_CONCURRENCY, (port) =>
-			probeWithFetch(host, port, options.fetchTimeoutMs),
+		runPool(lowPorts, FETCH_CONCURRENCY, async (port) =>
+			track(await probeWithFetch(host, port, fetchTimeoutMs)),
 		),
-		runPool(highBatches, ICE_CONCURRENCY, (batch) =>
-			probeBatchWithIce(host, batch, options.iceTimeoutMs),
+		runPool(highBatches, ICE_CONCURRENCY, async (batch) =>
+			(await probeBatchWithIce(host, batch, iceTimeoutMs)).map(track),
 		).then((batches) => batches.flat()),
 	]);
 

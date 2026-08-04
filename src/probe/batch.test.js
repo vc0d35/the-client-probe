@@ -80,3 +80,33 @@ test("probeBatches shares one connection per ICE batch", async () => {
 		},
 	);
 });
+
+test("probeBatches reports progress for every probe", async () => {
+	const events = [];
+
+	await withMockFetch(
+		async () => ({}),
+		async () => {
+			await withFakePeerConnection(
+				{ requestsSent: 1, remotePort: 8080 },
+				async () => {
+					await probeBatches("127.0.0.1", [80, 443, 8080], {
+						onProgress: (progress) => events.push(progress),
+					});
+
+					assert.equal(events.length, 3);
+					assert.equal(events.at(-1).completed, 3);
+					assert.equal(events.at(-1).total, 3);
+					assert.deepEqual(
+						events.map(({ completed }) => completed),
+						[1, 2, 3],
+					);
+					assert.deepEqual(
+						events.map(({ result }) => result.port).sort((a, b) => a - b),
+						[80, 443, 8080],
+					);
+				},
+			);
+		},
+	);
+});

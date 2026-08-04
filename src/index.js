@@ -32,6 +32,8 @@ export { probeBatchWithIce, probeWithIce } from "./probe/probeWithIce.js";
  * @param {number} [options.iceTimeoutMs] Per-batch deadline for ICE probes
  *   (ports >= 1024, 64 ports share one deadline). Default 2000; 500 is
  *   safe on loopback, ~1000 for LAN.
+ * @param {(progress: {completed: number, total: number, result: ProbeResult}) => void} [options.onProgress]
+ *   Called as each probe settles, for progress display or streaming use.
  * @returns {Promise<ProbeResult[]>}
  */
 export async function scanPorts(host, portsOrMin, max, options = {}) {
