@@ -18,15 +18,18 @@ export const PortState = Object.freeze({
  *
  * @param {string} host Hostname or IP literal.
  * @param {number} port TCP port number.
+ * @param {number} [timeoutMs=2000] How long to wait for response bytes
+ *   before classifying the port as open-silent. 500 ms is plenty on
+ *   loopback.
  * @returns {Promise<{host: string, port: number, state: string, durationMs: number}>}
  */
-export async function probeWithFetch(host, port) {
+export async function probeWithFetch(host, port, timeoutMs = FETCH_TIMEOUT_MS) {
 	const controller = new AbortController();
 	let timedOut = false;
 	const timer = setTimeout(() => {
 		timedOut = true;
 		controller.abort();
-	}, FETCH_TIMEOUT_MS);
+	}, timeoutMs);
 
 	const started = performance.now();
 	try {

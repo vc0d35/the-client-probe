@@ -42,18 +42,41 @@ test("probeBatches routes low ports to fetch and high ports to ICE", async () =>
 			return {};
 		},
 		async () => {
-			await withFakePeerConnection({ requestsSent: 1 }, async () => {
-				const results = await probeBatches("127.0.0.1", [80, 8080]);
+			await withFakePeerConnection(
+				{ requestsSent: 1, remotePort: 8080 },
+				async () => {
+					const results = await probeBatches("127.0.0.1", [80, 8080]);
 
-				assert.deepEqual(fetchUrls, ["http://127.0.0.1:80/"]);
-				assert.deepEqual(
-					results.map(({ port, state }) => ({ port, state })),
-					[
-						{ port: 80, state: PortState.Open },
-						{ port: 8080, state: PortState.Open },
-					],
-				);
+					assert.deepEqual(fetchUrls, ["http://127.0.0.1:80/"]);
+					assert.deepEqual(
+						results.map(({ port, state }) => ({ port, state })),
+						[
+							{ port: 80, state: PortState.Open },
+							{ port: 8080, state: PortState.Open },
+						],
+					);
+				},
+			);
+		},
+	);
+});
+
+test("probeBatches shares one connection per ICE batch", async () => {
+	await withFakePeerConnection(
+		{ requestsSent: 1, remotePort: 8080 },
+		async (instances) => {
+			const results = await probeBatches("127.0.0.1", [8080, 8081], {
+				iceTimeoutMs: 300,
 			});
+
+			assert.equal(instances.length, 1, "one peer connection for the batch");
+			assert.deepEqual(
+				results.map(({ port, state }) => ({ port, state })),
+				[
+					{ port: 8080, state: PortState.Open },
+					{ port: 8081, state: PortState.Closed },
+				],
+			);
 		},
 	);
 });

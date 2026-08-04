@@ -2,7 +2,7 @@ import { probeBatches } from "./probe/batch.js";
 import { parseArgs } from "./utils/parseArgs.js";
 
 export { PortState, probeWithFetch } from "./probe/probeWithFetch.js";
-export { probeWithIce } from "./probe/probeWithIce.js";
+export { probeBatchWithIce, probeWithIce } from "./probe/probeWithIce.js";
 
 /**
  * @typedef {{host: string, port: number, state: string, durationMs: number}} ProbeResult
@@ -26,9 +26,19 @@ export { probeWithIce } from "./probe/probeWithIce.js";
  * @param {readonly number[] | number} portsOrMin Ports to probe, or the
  * minimum port in a range.
  * @param {number} [max] Maximum port in a range.
+ * @param {object} [options]
+ * @param {number} [options.fetchTimeoutMs] Hang timeout for fetch probes
+ *   (ports < 1024). Default 2000; 500 is plenty on loopback.
+ * @param {number} [options.iceTimeoutMs] Per-batch deadline for ICE probes
+ *   (ports >= 1024, 64 ports share one deadline). Default 2000; 500 is
+ *   safe on loopback, ~1000 for LAN.
  * @returns {Promise<ProbeResult[]>}
  */
-export async function scanPorts(host, portsOrMin, max) {
+export async function scanPorts(host, portsOrMin, max, options = {}) {
+	if (typeof max === "object" && max !== null) {
+		options = max;
+		max = undefined;
+	}
 	const ports = parseArgs(portsOrMin, max);
-	return probeBatches(host, ports);
+	return probeBatches(host, ports, options);
 }

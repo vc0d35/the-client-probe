@@ -16,20 +16,38 @@ export interface ProbeResult {
 export declare function probeWithFetch(
 	host: string,
 	port: number,
+	timeoutMs?: number,
 ): Promise<ProbeResult>;
 
 export declare function probeWithIce(
 	host: string,
 	port: number,
+	timeoutMs?: number,
 ): Promise<ProbeResult>;
+
+/** Batched ICE probe: many ports share one RTCPeerConnection and one timeout. */
+export declare function probeBatchWithIce(
+	host: string,
+	ports: readonly number[],
+	timeoutMs?: number,
+): Promise<ProbeResult[]>;
+
+export interface ScanOptions {
+	/** Hang timeout for fetch probes (ports < 1024). Default 2000. */
+	fetchTimeoutMs?: number;
+	/** Per-batch deadline for ICE probes (ports >= 1024). Default 2000. */
+	iceTimeoutMs?: number;
+}
 
 export declare function scanPorts(
 	host: string,
 	ports: readonly number[],
+	options?: ScanOptions,
 ): Promise<ProbeResult[]>;
 
 export declare function scanPorts(
 	host: string,
 	min: number,
 	max: number,
+	options?: ScanOptions,
 ): Promise<ProbeResult[]>;
