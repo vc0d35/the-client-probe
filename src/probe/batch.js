@@ -1,12 +1,13 @@
-import { probeWithFetch } from "./probeWithFetch.js";
+import { PortState, probeWithFetch } from "./probeWithFetch.js";
 import { probeBatchWithIce } from "./probeWithIce.js";
+import { RESTRICTED_PORTS } from "./restrictedPorts.js";
 
 const FETCH_CONCURRENCY = 128;
 const ICE_BATCH_SIZE = 64;
 const ICE_CONCURRENCY = 16;
 
 /**
- * @typedef {{host: string, port: number, state: string, durationMs: number}} ProbeResult
+ * @typedef {{host: string, port: number, state: "open"|"open-silent"|"closed"|"restricted", durationMs: number}} ProbeResult
  */
 
 /**
@@ -34,7 +35,9 @@ async function runPool(items, concurrency, task) {
 /**
  * Probe ports, routing each to the best channel for it and keeping the
  * page responsive: fetch for ports < 1024 (libwebrtc rejects ICE candidates
- * to low ports on local addresses), batched ICE above. The two channels run
+ * to low ports on local addresses), batched ICE above. Ports on Chromium's
+ * restricted list (net/base/port_util.cc) cannot be scanned at all and are
+ * reported as "restricted" without probing. The two channels run
  * concurrently and use independent resource pools (HTTP sockets vs WebRTC
  * P2P sockets), so neither starves the other.
  *
@@ -61,6 +64,7 @@ export async function probeBatches(host, ports, options = {}) {
 	const lowPorts = [];
 	const highPorts = [];
 	for (const port of ports) {
+		if (RESTRICTED_PORTS.has(port)) continue;
 		(port < 1024 ? lowPorts : highPorts).push(port);
 	}
 
@@ -79,12 +83,19 @@ export async function probeBatches(host, ports, options = {}) {
 		).then((batches) => batches.flat()),
 	]);
 
-	// Merge back into input order.
+	// Merge back into input order; restricted ports are reported without
+	// probing.
 	const results = [];
 	let low = 0;
 	let high = 0;
 	for (const port of ports) {
-		results.push(port < 1024 ? lowResults[low++] : highResults[high++]);
+		if (RESTRICTED_PORTS.has(port)) {
+			results.push(
+				track({ host, port, state: PortState.Restricted, durationMs: 0 }),
+			);
+		} else {
+			results.push(port < 1024 ? lowResults[low++] : highResults[high++]);
+		}
 	}
 	return results;
 }

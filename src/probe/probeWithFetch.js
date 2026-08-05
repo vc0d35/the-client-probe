@@ -7,10 +7,12 @@ export const PortState = Object.freeze({
 	Open: "open",
 	OpenSilent: "open-silent",
 	Closed: "closed",
+	/** On Chromium's restricted-port list; cannot be scanned at all. */
+	Restricted: "restricted",
 });
 
 /**
- * @typedef {{host: string, port: number, state: "open"|"open-silent"|"closed", durationMs: number}} ProbeResult
+ * @typedef {{host: string, port: number, state: "open"|"open-silent"|"closed"|"restricted", durationMs: number}} ProbeResult
  */
 
 /**
@@ -22,6 +24,9 @@ export const PortState = Object.freeze({
  * rejections also happen for OPEN ports whose response is CORP/ORB-blocked
  * or not valid HTTP (e.g. SSH banners); those are false negatives this
  * channel cannot avoid. probeWithIce (ports >= 1024) is immune to them.
+ * Ports on Chromium's restricted list also misreport as closed when
+ * probed directly (ERR_UNSAFE_PORT is indistinguishable from a refusal);
+ * probeBatches short-circuits those to "restricted".
  *
  * @param {string} host Hostname or IP literal.
  * @param {number} port TCP port number.
