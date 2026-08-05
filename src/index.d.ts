@@ -14,6 +14,9 @@ export interface ProbeResult {
 	durationMs: number;
 }
 
+/** Chromium's restricted-port list; these ports are reported as "restricted" without probing. */
+export const RESTRICTED_PORTS: ReadonlySet<number>;
+
 export declare function probeWithFetch(
 	host: string,
 	port: number,
