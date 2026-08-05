@@ -16,6 +16,8 @@
 	},
 	"files": [
 		"src",
+		"!src/**/*.test.js",
+		"!src/testing",
 		"README.md"
 	],
 	"sideEffects": false,

@@ -3,6 +3,7 @@ import { parseArgs } from "./utils/parseArgs.js";
 
 export { PortState, probeWithFetch } from "./probe/probeWithFetch.js";
 export { probeBatchWithIce, probeWithIce } from "./probe/probeWithIce.js";
+export { RESTRICTED_PORTS } from "./probe/restrictedPorts.js";
 
 /**
  * @typedef {import("./probe/probeWithFetch.js").ProbeResult} ProbeResult
@@ -12,6 +13,7 @@ export { probeBatchWithIce, probeWithIce } from "./probe/probeWithIce.js";
  * @overload
  * @param {string} host Hostname or IP literal.
  * @param {readonly number[]} ports Ports to probe.
+ * @param {object} [options]
  * @returns {Promise<ProbeResult[]>}
  */
 /**
@@ -19,6 +21,7 @@ export { probeBatchWithIce, probeWithIce } from "./probe/probeWithIce.js";
  * @param {string} host Hostname or IP literal.
  * @param {number} min Minimum port in a range.
  * @param {number} max Maximum port in a range.
+ * @param {object} [options]
  * @returns {Promise<ProbeResult[]>}
  */
 /**
