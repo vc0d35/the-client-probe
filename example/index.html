@@ -50,7 +50,6 @@
       const host = "127.0.0.1";
       const progress = document.querySelector("#progress");
       const result = document.querySelector("#result");
-      const found = [];
 
       const renderRow = ({ port, state, durationMs }) => {
         const target = `${host}:${port}`.padEnd(20);
@@ -63,8 +62,7 @@
         onProgress({ completed, total, result: probeResult }) {
           progress.textContent = `scanned ${completed} / ${total} ports`;
           if (probeResult.state !== "closed") {
-            found.push(probeResult);
-            result.innerHTML = found.map(renderRow).join("");
+            result.insertAdjacentHTML("beforeend", renderRow(probeResult));
           }
         },
       });

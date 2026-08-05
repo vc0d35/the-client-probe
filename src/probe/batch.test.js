@@ -94,8 +94,6 @@ test("probeBatches reports progress for every probe", async () => {
 						onProgress: (progress) => events.push(progress),
 					});
 
-					assert.equal(events.length, 3);
-					assert.equal(events.at(-1).completed, 3);
 					assert.equal(events.at(-1).total, 3);
 					assert.deepEqual(
 						events.map(({ completed }) => completed),
