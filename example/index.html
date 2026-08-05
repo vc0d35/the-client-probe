@@ -16,6 +16,35 @@
         font-size: 1.2rem;
       }
 
+      form {
+        display: flex;
+        gap: 0.5rem;
+        margin-block: 1rem;
+      }
+
+      input,
+      button {
+        background: #1c1f26;
+        border: 1px solid #3a3f4a;
+        border-radius: 0.25rem;
+        color: #e6e6e6;
+        font: inherit;
+        padding: 0.4rem 0.6rem;
+      }
+
+      input {
+        inline-size: 22rem;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      button:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+
       #result {
         white-space: pre;
       }
@@ -44,7 +73,17 @@
   <body>
     <main>
       <h1>The Client Probe</h1>
-      <div id="progress">starting…</div>
+      <p>Scans run against <strong>127.0.0.1</strong> — your own machine.</p>
+      <form id="scan-form">
+        <input
+          id="ports"
+          placeholder="80, 443, 8080 — one port or a list"
+          autocomplete="off"
+        >
+        <button type="submit">Scan</button>
+        <button type="button" id="scan-all">Scan all ports</button>
+      </form>
+      <div id="progress">enter ports to scan</div>
       <div id="result"></div>
     </main>
 
@@ -52,6 +91,9 @@
       import * as theClientProbe from "../src/index.js";
 
       const host = "127.0.0.1";
+      const form = document.querySelector("#scan-form");
+      const input = document.querySelector("#ports");
+      const scanAllButton = document.querySelector("#scan-all");
       const progress = document.querySelector("#progress");
       const result = document.querySelector("#result");
 
@@ -61,17 +103,65 @@
         return `<div class="${state}">${target} ${state.padEnd(11)} ${ms}</div>`;
       };
 
-      await theClientProbe.scanPorts(host, 1, 65535, {
-        fetchTimeoutMs: 500,
-        onProgress({ completed, total, result: probeResult }) {
-          progress.textContent = `scanned ${completed} / ${total} ports`;
-          if (probeResult.state !== "closed") {
+      function parsePorts(text) {
+        return text
+          .split(/[\s,]+/)
+          .filter(Boolean)
+          .map(Number)
+          .filter((port) => Number.isInteger(port) && port >= 0 && port <= 65535);
+      }
+
+      function scanOptions(results) {
+        return {
+          fetchTimeoutMs: 500,
+          onProgress({ completed, total, result: probeResult }) {
+            progress.textContent = `scanned ${completed} / ${total} ports`;
+            results.push(probeResult);
             result.insertAdjacentHTML("beforeend", renderRow(probeResult));
-          }
-        },
+          },
+        };
+      }
+
+      function showResults(results) {
+        const order = { open: 0, "open-silent": 1, restricted: 2, closed: 3 };
+        results.sort(
+          (a, b) => order[a.state] - order[b.state] || a.port - b.port,
+        );
+        result.innerHTML = results.map(renderRow).join("");
+      }
+
+      async function runScan(portsOrRange) {
+        progress.textContent = "starting…";
+        result.textContent = "";
+        for (const button of form.querySelectorAll("button")) {
+          button.disabled = true;
+        }
+
+        const results = [];
+        const scan =
+          portsOrRange === "all"
+            ? theClientProbe.scanPorts(host, 1, 65535, scanOptions(results))
+            : theClientProbe.scanPorts(host, portsOrRange, scanOptions(results));
+
+        await scan;
+        showResults(results);
+        progress.textContent = "done";
+        for (const button of form.querySelectorAll("button")) {
+          button.disabled = false;
+        }
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const ports = parsePorts(input.value);
+        if (ports.length === 0) {
+          progress.textContent = "enter at least one valid port (0–65535)";
+          return;
+        }
+        runScan(ports);
       });
 
-      progress.textContent = "done";
+      scanAllButton.addEventListener("click", () => runScan("all"));
     </script>
   </body>
 </html>
