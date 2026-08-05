@@ -15,6 +15,11 @@ the mixed-content and Local Network Access restrictions that complicate
 public-target scanning. For internet hosts, use it for targeted checks on
 known ports rather than sweeps, and give the timeouts RTT headroom.
 
+## See it live
+
+<https://the-client-probe.vercel.app/example/index.html> — the example page,
+deployed on Vercel.
+
 ## Browser support
 
 Developed and verified against Chrome 150 on MacOS. Firefox and Safari
