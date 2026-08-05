@@ -3,7 +3,7 @@ import { probeBatchWithIce } from "./probeWithIce.js";
 
 const FETCH_CONCURRENCY = 128;
 const ICE_BATCH_SIZE = 64;
-const ICE_CONCURRENCY = 8;
+const ICE_CONCURRENCY = 16;
 
 /**
  * @typedef {{host: string, port: number, state: string, durationMs: number}} ProbeResult
