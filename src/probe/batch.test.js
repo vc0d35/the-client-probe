@@ -17,7 +17,7 @@ test("probeBatches preserves order and limits concurrent probes", async () => {
 			activeProbes -= 1;
 		},
 		async () => {
-			const ports = Array.from({ length: 130 }, (_, port) => port + 1);
+			const ports = Array.from({ length: 130 }, (_, index) => index + 200);
 			const results = await probeBatches("localhost", ports);
 
 			assert.equal(maximumActiveProbes, 128);
@@ -55,6 +55,47 @@ test("probeBatches routes low ports to fetch and high ports to ICE", async () =>
 							{ port: 8080, state: PortState.Open },
 						],
 					);
+				},
+			);
+		},
+	);
+});
+
+test("probeBatches reports restricted ports without probing them", async () => {
+	const fetchUrls = [];
+
+	await withMockFetch(
+		async (url) => {
+			fetchUrls.push(url);
+			return {};
+		},
+		async () => {
+			await withFakePeerConnection(
+				{ requestsSent: 1, remotePort: 8080 },
+				async (instances) => {
+					const events = [];
+					const results = await probeBatches(
+						"127.0.0.1",
+						[22, 80, 6000, 8080],
+						{
+							onProgress: (progress) => events.push(progress),
+						},
+					);
+
+					assert.equal(events.at(-1).completed, 4);
+					assert.deepEqual(fetchUrls, ["http://127.0.0.1:80/"]);
+					assert.deepEqual(
+						results.map(({ port, state }) => ({ port, state })),
+						[
+							{ port: 22, state: PortState.Restricted },
+							{ port: 80, state: PortState.Open },
+							{ port: 6000, state: PortState.Restricted },
+							{ port: 8080, state: PortState.Open },
+						],
+					);
+					const sdp = instances[0].remoteDescription.sdp;
+					assert.match(sdp, /8080/);
+					assert.doesNotMatch(sdp, /6000/);
 				},
 			);
 		},

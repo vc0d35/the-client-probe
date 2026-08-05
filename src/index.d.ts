@@ -1,9 +1,10 @@
-export type PortStateValue = "open" | "open-silent" | "closed";
+export type PortStateValue = "open" | "open-silent" | "closed" | "restricted";
 
 export const PortState: {
 	readonly Open: "open";
 	readonly OpenSilent: "open-silent";
 	readonly Closed: "closed";
+	readonly Restricted: "restricted";
 };
 
 export interface ProbeResult {

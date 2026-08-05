@@ -107,7 +107,8 @@ export async function probeWithIce(host, port, timeoutMs) {
  * The oracle is STUN traffic on the pair (requestsSent > 0); a silently
  * filtered port (SYN dropped, no RST) produces none, so "closed" means
  * refused-or-filtered. Restricted ports (6000, 5060, 6665-6669, ...) are
- * blocked at Chromium's P2P socket layer and always report closed.
+ * blocked at Chromium's P2P socket layer; probeBatches short-circuits them
+ * to "restricted" before probing.
  *
  * @param {string} host Hostname or IP literal.
  * @param {readonly number[]} ports TCP ports, each 1024–65535.
