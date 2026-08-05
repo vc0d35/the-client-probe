@@ -59,8 +59,7 @@ async function collectReachablePorts(connection, reachable) {
 	for (const report of stats.values()) {
 		if (report.type === "remote-candidate") {
 			remotePorts.set(report.id, report.port);
-		}
-		if (report.type === "candidate-pair" && report.requestsSent > 0) {
+		} else if (report.type === "candidate-pair" && report.requestsSent > 0) {
 			pairs.push(report);
 		}
 	}
@@ -93,7 +92,7 @@ const adaptiveTimeoutMs = (portCount) => portCount * 100 + 500;
  * @param {number} port TCP port number, 1024–65535.
  * @param {number} [timeoutMs] How long to wait for traffic before
  *   classifying as closed. Default: adaptive to batch size.
- * @returns {Promise<{host: string, port: number, state: string, durationMs: number}>}
+ * @returns {Promise<import("./probeWithFetch.js").ProbeResult>}
  */
 export async function probeWithIce(host, port, timeoutMs) {
 	const [result] = await probeBatchWithIce(host, [port], timeoutMs);
@@ -117,7 +116,7 @@ export async function probeWithIce(host, port, timeoutMs) {
  *   batch. Default adapts to batch size (ports.length * 100 + 500 ms) to
  *   cover Chromium's check pacing; shorter explicit values are only safe
  *   for small batches.
- * @returns {Promise<{host: string, port: number, state: string, durationMs: number}[]>}
+ * @returns {Promise<import("./probeWithFetch.js").ProbeResult[]>}
  */
 export async function probeBatchWithIce(host, ports, timeoutMs) {
 	if (typeof RTCPeerConnection === "undefined") {
@@ -127,13 +126,16 @@ export async function probeBatchWithIce(host, ports, timeoutMs) {
 	}
 
 	const deadline = timeoutMs ?? adaptiveTimeoutMs(ports.length);
+	// A Set collapses duplicate ports; without this the loop below would
+	// never exit early for duplicated input and always burn the deadline.
+	const pending = new Set(ports).size;
 	const started = performance.now();
 	const connection = await startChecks(host, ports);
 
 	try {
 		const reachable = new Set();
 		const deadlineAt = started + deadline;
-		while (reachable.size < ports.length && performance.now() < deadlineAt) {
+		while (reachable.size < pending && performance.now() < deadlineAt) {
 			await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 			await collectReachablePorts(connection, reachable);
 		}
