@@ -161,9 +161,36 @@ A `no-cors` fetch with an abort timeout classifies by outcome: resolve →
 response is CORP/ORB-blocked or not valid HTTP (SSH banners, binary
 protocols) also reject — which is why ICE is the default above 1024.
 
+## Local Network Access (LNA)
+
+Since Chrome 142, requests from a **public origin** to loopback or private
+addresses require a user-granted permission (secure contexts only). The
+check runs *after* the TCP connect but *before* any request bytes are
+sent — so closed ports never trigger it (their connect fails first) and
+report `closed` normally in every state. Only open ports are affected:
+
+| Permission state | Fetch leg, open ports | ICE leg (≥ 1024) |
+|---|---|---|
+| **Prompt shown, unanswered** | hang until our abort fires → reported `open-silent` — which here *means* open: only a completed connect can hang | unaffected |
+| **Granted** | correct verdict | unaffected |
+| **Denied** | connect succeeds, then blocked → fast rejection → misreported `closed` | unaffected |
+
+Two consequences worth knowing:
+
+- **During the prompt, `open-silent` is a positive signal**, not an
+  ambiguous one — closed ports refuse instantly, so anything hanging is
+  listening. Once the user decides, verdicts normalize: granted → `open`,
+  denied → `closed`.
+- **The ICE channel is not gated** (`kLocalNetworkAccessChecksWebRTC` is
+  disabled by default), so ports ≥ 1024 scan correctly no matter what the
+  user chooses — the reason this library defaults to ICE above 1024.
+
+From localhost or LAN origins, LNA never engages at all — the gate is
+strictly public → local.
+
 ## Limitations
 
-- **Local Network Access (Chrome 142+):** from a *public HTTPS origin*, requests to loopback/LAN are gated behind a user permission prompt (fetch leg). The ICE channel is currently **not** gated — WebRTC was left out of LNA — so ≥1024 scanning works silently from public pages today. From localhost/LAN origins nothing is gated.
+- **Local Network Access (Chrome 142+):** from a public HTTPS origin, the fetch leg is permission-gated — see the LNA section above for the prompt-pending / granted / denied behavior matrix. From localhost/LAN origins nothing is gated.
 - **Restricted ports are unscannable:** Chromium blocks ~80 well-known ports (22, 25, 53, 6000, 6665–6669, 10080, … — [`kRestrictedPorts` in `net/base/port_util.cc`](https://github.com/chromium/chromium/blob/main/net/base/port_util.cc)) before any network I/O, for both channels. The scanner reports these as `"restricted"` without probing (`RESTRICTED_PORTS` is exported for filtering). Note Chromium also enforces a second, server-pushed localhost blocklist (`kRestrictAbusePortsOnLocalhost`) whose contents aren't in the source tree — a port can be unscannable even when it's not in the static list.
 - **Performance:** ICE checks are paced by Chromium (~65 ms/candidate/connection, not configurable from JS). A full 1–65535 sweep takes ~7–8 minutes; targeted lists take seconds. Closed ports cost a full batch deadline — that's the price of an absence-based verdict.
 - **Background tabs throttle timers** (`setTimeout` clamps to ≥1 s), degrading the polling loop and deadlines. Scans slow down noticeably; keep the tab visible for full sweeps.
