@@ -14,7 +14,10 @@ export const PortState = Object.freeze({
  *
  * A resolved fetch means the service responded. An abort caused by the
  * internal timeout means the connection stayed open without response bytes.
- * Any other rejection is classified as closed.
+ * Any other rejection is classified as closed — but note rejections also
+ * happen for OPEN ports whose response is CORP/ORB-blocked or not valid
+ * HTTP (e.g. SSH banners); those are false negatives this channel cannot
+ * avoid. probeWithIce (ports >= 1024) is immune to them.
  *
  * @param {string} host Hostname or IP literal.
  * @param {number} port TCP port number.
