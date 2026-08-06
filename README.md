@@ -10,15 +10,21 @@ security research.
 
 It works against any routable host, but it is optimized for localhost and
 LAN targets: the ICE channel's pacing (~15 ports/s/connection) and loopback
-RTTs make local sweeps practical, and requests to local targets are free of
-the mixed-content and Local Network Access restrictions that complicate
-public-target scanning. For internet hosts, use it for targeted checks on
-known ports rather than sweeps, and give the timeouts RTT headroom.
+RTTs make local sweeps practical, and loopback is exempt from the
+mixed-content blocking that hits plain-HTTP LAN targets fetched from an
+HTTPS page. Note that from a *public* origin, Chrome's Local Network
+Access permission still gates the fetch leg (ports < 1024) — see
+*Local Network Access* below. For internet hosts, use it for targeted
+checks on known ports rather than sweeps, and give the timeouts RTT
+headroom.
 
 ## See it live
 
 <https://the-client-probe.vercel.app/example/index.html> — the example page,
-deployed on Vercel.
+deployed on Vercel. **Use Chrome**: the ICE channel (ports ≥ 1024) is
+Chromium-only for now, so on other engines those ports silently misreport
+as closed. On Chrome 142+, scanning from this public origin will trigger
+the Local Network Access permission prompt for the fetch leg (ports < 1024).
 
 ## Browser support
 
@@ -222,7 +228,7 @@ color-coded results as they're found: green for `open`, amber for
 ## Development
 
 ```sh
-npm test          # node:test suite (10 tests)
+npm test          # node:test suite (12 tests)
 npm run lint      # biome check
 npm run example   # demo page with live progress at /example/index.html
 ```
