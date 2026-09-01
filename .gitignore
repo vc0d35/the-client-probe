@@ -9,6 +9,9 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
+# Internal planning/design docs (not shipped, not tracked)
+docs/superpowers/
+
 .DS_Store
 
 .vercel
