@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>the-client-probe e2e harness</title>
+	</head>
+	<body>
+		<!--
+			Minimal page whose only job is to load the library under test from the
+			same origin and expose it to page.evaluate. Tests drive the real exported
+			functions and assert on the returned ProbeResult JSON.
+		-->
+		<script type="module">
+			import * as probe from "/src/index.js";
+
+			window.__probe = probe;
+		</script>
+	</body>
+</html>

@@ -18,3 +18,32 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Chrome only for now; Firefox/WebKit are added as Playwright projects later.
+      - run: npx playwright install --with-deps chromium
+
+      # Allow binding real ports < 1024 so the scanPorts fetch-route test exercises
+      # the true "< 1024 -> fetch" routing instead of skipping. Linux-only knob;
+      # off CI the test skips itself.
+      - run: sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1
+
+      - run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
