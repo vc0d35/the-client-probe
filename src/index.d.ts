@@ -14,7 +14,6 @@ export interface ProbeResult {
 	durationMs: number;
 }
 
-/** Chromium's restricted-port list; these ports are reported as "restricted" without probing. */
 export const RESTRICTED_PORTS: ReadonlySet<number>;
 
 export declare function probeWithFetch(
@@ -29,7 +28,6 @@ export declare function probeWithIce(
 	timeoutMs?: number,
 ): Promise<ProbeResult>;
 
-/** Batched ICE probe: many ports share one RTCPeerConnection and one timeout. */
 export declare function probeBatchWithIce(
 	host: string,
 	ports: readonly number[],
@@ -43,16 +41,8 @@ export interface ScanProgress {
 }
 
 export interface ScanOptions {
-	/** Hang timeout for fetch probes (ports < 1024). Default 2000. */
 	fetchTimeoutMs?: number;
-	/**
-	 * Per-batch deadline for ICE probes (ports >= 1024). Default is
-	 * adaptive (batchSize * 100 + 500 ms) to cover Chromium's ~65
-	 * ms/candidate pacing; shorter explicit values are only safe for
-	 * small batches.
-	 */
 	iceTimeoutMs?: number;
-	/** Called as each probe settles. */
 	onProgress?: (progress: ScanProgress) => void;
 }
 
