@@ -1,10 +1,6 @@
 const MIN_PORT = 0;
 const MAX_PORT = 65535;
 
-/**
- * @param {unknown} port
- * @returns {port is number}
- */
 function isValidPort(port) {
 	return (
 		typeof port === "number" &&
@@ -14,9 +10,6 @@ function isValidPort(port) {
 	);
 }
 
-/**
- * @param {readonly number[]} ports
- */
 function validatePorts(ports) {
 	for (const port of ports) {
 		if (!isValidPort(port)) {
@@ -27,12 +20,6 @@ function validatePorts(ports) {
 	}
 }
 
-/**
- * @param {readonly number[] | number} portsOrMin Ports to probe, or the
- * minimum port in a range.
- * @param {number} [max] Maximum port in a range.
- * @returns {number[]}
- */
 export function parseArgs(portsOrMin, max) {
 	if (typeof portsOrMin !== "number") {
 		if (!Array.isArray(portsOrMin)) {

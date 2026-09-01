@@ -2,14 +2,10 @@ import { PortState } from "./probeWithFetch.js";
 
 const POLL_INTERVAL_MS = 100;
 
-/**
- * Build a minimal SDP answer that plants one ICE candidate per probe target.
- * Chromium accepts literal IP candidates for ports >= 1024 on local
- * addresses; lower ports are rejected by libwebrtc's VerifyCandidate
- * ("Disallow all ports below 1024, except for 80 and 443 on public
- * addresses") — see p2p/base/ice_transport_internal.cc in webrtc/src
- * (https://webrtc.googlesource.com/src/+/main/p2p/base/ice_transport_internal.cc).
- */
+// Forge an SDP answer (there is no second peer) that plants one passive ICE-TCP
+// candidate per target port. libwebrtc rejects candidates to ports < 1024 on
+// local addresses (VerifyCandidate), which is why batch.js sends the low range
+// through fetch instead.
 function buildAnswerSdp({ mid, host, ports }) {
 	const lines = [
 		"v=0",
@@ -46,12 +42,10 @@ async function startChecks(host, ports) {
 	return connection;
 }
 
-/**
- * Per-port connect evidence: only a candidate pair that actually SENT STUN
- * traffic proves the connect succeeded. Pair existence is not sufficient —
- * blocked sockets (restricted ports, P2P pool exhaustion) leave pairs
- * pending in "waiting" forever.
- */
+// Open-port oracle: a candidate pair counts only once it has actually sent STUN
+// traffic (requestsSent > 0). Pairs are formed before connectivity is checked,
+// so pair existence alone proves nothing — a blocked socket leaves its pair
+// waiting forever.
 async function collectReachablePorts(connection, reachable) {
 	const stats = await connection.getStats();
 	const remotePorts = new Map();
@@ -71,54 +65,19 @@ async function collectReachablePorts(connection, reachable) {
 	}
 }
 
-/**
- * ICE-TCP checks are paced at ~65 ms per candidate per connection
- * (kWeakPingInterval = 48 ms plus per-tick overhead; 64 candidates → last
- * check at ~4.1 s), so the deadline must scale with batch size or
- * late-paced open ports look closed.
- */
+// libwebrtc paces ICE-TCP checks at ~65 ms per candidate per connection, so the
+// deadline must grow with batch size or late-checked open ports look closed.
 const adaptiveTimeoutMs = (portCount) => portCount * 100 + 500;
 
-/**
- * Probe one TCP port with a WebRTC ICE connectivity check (a one-port
- * probeBatchWithIce — see it for how detection works).
- *
- * Unlike probeWithFetch this observes connect success directly, so it is
- * immune to CORP/ORB and non-HTTP responses — but it needs one
- * RTCPeerConnection per probe and only works for ports >= 1024 that are
- * not on Chromium's restricted-port list (e.g. 6000, 5060, 6665-6669).
- *
- * @param {string} host Hostname or IP literal.
- * @param {number} port TCP port number, 1024–65535.
- * @param {number} [timeoutMs] How long to wait for traffic before
- *   classifying as closed. Default: adaptive to batch size.
- * @returns {Promise<import("./probeWithFetch.js").ProbeResult>}
- */
 export async function probeWithIce(host, port, timeoutMs) {
 	const [result] = await probeBatchWithIce(host, [port], timeoutMs);
 	return result;
 }
 
-/**
- * Probe many TCP ports with ICE connectivity checks, sharing one
- * RTCPeerConnection per batch (one planted candidate per port), so a
- * batch of closed ports costs one timeout instead of one per port.
- *
- * The oracle is STUN traffic on the pair (requestsSent > 0); a silently
- * filtered port (SYN dropped, no RST) produces none, so "closed" means
- * refused-or-filtered. Restricted ports (6000, 5060, 6665-6669, ...) are
- * blocked at Chromium's P2P socket layer; probeBatches short-circuits them
- * to "restricted" before probing.
- *
- * @param {string} host Hostname or IP literal.
- * @param {readonly number[]} ports TCP ports, each 1024–65535.
- * @param {number} [timeoutMs] Per-batch deadline; "closed" is an
- *   absence-of-traffic verdict, so this bounds every closed port in the
- *   batch. Default adapts to batch size (ports.length * 100 + 500 ms) to
- *   cover Chromium's check pacing; shorter explicit values are only safe
- *   for small batches.
- * @returns {Promise<import("./probeWithFetch.js").ProbeResult[]>}
- */
+// One RTCPeerConnection carries the whole batch (one planted candidate per
+// port), so a batch of closed ports costs a single shared deadline instead of
+// one timeout each. "closed" is an absence-of-traffic verdict, so a silently
+// filtered port is indistinguishable from a refused one.
 export async function probeBatchWithIce(host, ports, timeoutMs) {
 	if (typeof RTCPeerConnection === "undefined") {
 		throw new Error(

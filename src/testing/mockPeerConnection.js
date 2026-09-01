@@ -1,12 +1,6 @@
-/**
- * @param {object} [options]
- * @param {number} [options.requestsSent=0] requestsSent on the fake pair.
- * @param {number} [options.remotePort] When set, the fake also reports a
- *   remote-candidate with this port and links the pair to it, so batched
- *   probes can attribute the traffic to a port.
- * @param {(instances: object[]) => Promise<unknown>} fn The test body; gets
- *   every created fake instance for inspection.
- */
+// Minimal RTCPeerConnection fake. getStats reproduces the real remote-candidate
+// / candidate-pair join so tests exercise port attribution instead of bypassing
+// it.
 export async function withFakePeerConnection(
 	{ requestsSent = 0, remotePort } = {},
 	fn,

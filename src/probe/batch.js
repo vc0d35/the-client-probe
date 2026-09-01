@@ -6,15 +6,8 @@ const FETCH_CONCURRENCY = 128;
 const ICE_BATCH_SIZE = 64;
 const ICE_CONCURRENCY = 16;
 
-/**
- * @typedef {{host: string, port: number, state: "open"|"open-silent"|"closed"|"restricted", durationMs: number}} ProbeResult
- */
-
-/**
- * Run `task` over `items` with a bounded worker pool: each worker takes the
- * next item as soon as it finishes its previous one, so a single slow item
- * never stalls the rest (no batch barrier).
- */
+// Bounded worker pool: each worker claims the next index as soon as it frees up,
+// so a slow item never stalls the rest. Results keep input order.
 async function runPool(items, concurrency, task) {
 	const results = new Array(items.length);
 	let next = 0;
@@ -32,25 +25,11 @@ async function runPool(items, concurrency, task) {
 	return results;
 }
 
-/**
- * Probe ports, routing each to the best channel for it and keeping the
- * page responsive: fetch for ports < 1024 (libwebrtc rejects ICE candidates
- * to low ports on local addresses), batched ICE above. Ports on Chromium's
- * restricted list (net/base/port_util.cc) cannot be scanned at all and are
- * reported as "restricted" without probing. The two channels run
- * concurrently and use independent resource pools (HTTP sockets vs WebRTC
- * P2P sockets), so neither starves the other.
- *
- * @param {string} host Hostname or IP literal.
- * @param {readonly number[]} ports Ports to probe.
- * @param {object} [options]
- * @param {number} [options.fetchTimeoutMs] Forwarded to probeWithFetch.
- * @param {number} [options.iceTimeoutMs] Forwarded to probeBatchWithIce.
- * @param {(progress: {completed: number, total: number, result: ProbeResult}) => void} [options.onProgress]
- *   Called as each probe settles — fetch probes report individually, ICE
- *   probes report when their 64-port batch completes.
- * @returns {Promise<ProbeResult[]>} Results in the same order as `ports`.
- */
+// Route each port to the channel that can reach it: fetch below 1024 (libwebrtc
+// rejects ICE candidates to low local ports), batched ICE above, restricted
+// ports reported without probing. The two channels run concurrently on
+// independent socket pools so neither starves the other; results stay in the
+// caller's order.
 export async function probeBatches(host, ports, options = {}) {
 	const { fetchTimeoutMs, iceTimeoutMs, onProgress } = options;
 	const total = ports.length;
@@ -83,8 +62,7 @@ export async function probeBatches(host, ports, options = {}) {
 		).then((batches) => batches.flat()),
 	]);
 
-	// Merge back into input order; restricted ports are reported without
-	// probing.
+	// Reinsert restricted ports and restore the caller's original order.
 	const results = [];
 	let low = 0;
 	let high = 0;

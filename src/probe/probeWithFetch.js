@@ -1,43 +1,22 @@
 const FETCH_TIMEOUT_MS = 2000;
 
-/**
- * Port states observable from a probe.
- */
 export const PortState = Object.freeze({
 	Open: "open",
 	OpenSilent: "open-silent",
 	Closed: "closed",
-	/** On Chromium's restricted-port list; cannot be scanned at all. */
 	Restricted: "restricted",
 });
 
-/**
- * @typedef {{host: string, port: number, state: "open"|"open-silent"|"closed"|"restricted", durationMs: number}} ProbeResult
- */
-
-/**
- * Probe one TCP port with fetch.
- *
- * A resolved fetch means the service responded. A TimeoutError (from the
- * AbortSignal.timeout signal) means the connection stayed open without
- * response bytes. Any other rejection is classified as closed — but note
- * rejections also happen for OPEN ports whose response is CORP/ORB-blocked
- * or not valid HTTP (e.g. SSH banners); those are false negatives this
- * channel cannot avoid. probeWithIce (ports >= 1024) is immune to them.
- * Ports on Chromium's restricted list also misreport as closed when
- * probed directly (ERR_UNSAFE_PORT is indistinguishable from a refusal);
- * probeBatches short-circuits those to "restricted".
- *
- * @param {string} host Hostname or IP literal.
- * @param {number} port TCP port number.
- * @param {number} [timeoutMs=2000] How long to wait for response bytes
- *   before classifying the port as open-silent. 500 ms is plenty on
- *   loopback.
- * @returns {Promise<ProbeResult>}
- */
+// Classify a port by the outcome of a no-cors fetch: resolved -> open,
+// TimeoutError (the abort signal) -> open-silent, any other rejection -> closed.
+// That last bucket is lossy: an open port whose response is CORP/ORB-blocked or
+// not valid HTTP (SSH banners, binary protocols) also rejects and misreports as
+// closed — which is why ports >= 1024 use the ICE channel instead.
 export async function probeWithFetch(host, port, timeoutMs = FETCH_TIMEOUT_MS) {
 	const started = performance.now();
 	try {
+		// no-cors so a cross-origin response resolves (opaque) rather than failing
+		// the CORS check; no-store to bypass the HTTP cache.
 		await fetch(`http://${host}:${port}/`, {
 			mode: "no-cors",
 			cache: "no-store",
