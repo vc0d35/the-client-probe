@@ -228,7 +228,22 @@ color-coded results as they're found: green for `open`, amber for
 ## Development
 
 ```sh
-npm test          # node:test suite (12 tests)
+npm test          # node:test unit suite (mocked fetch + RTCPeerConnection)
+npm run test:e2e  # Playwright e2e in real Chrome — see below
 npm run lint      # biome check
 npm run example   # demo page with live progress at /example/index.html
 ```
+
+### End-to-end tests
+
+`npm run test:e2e` runs the real library in a real Chrome (via Playwright)
+against hermetic loopback servers, verifying the behavior the unit suite can
+only mock: the ICE-TCP channel against real libwebrtc, and `no-cors` fetch
+classification. Install the browser once with `npx playwright install
+chromium`.
+
+Chrome only for now (the ICE channel is Chromium-specific); Firefox/WebKit are
+staged as commented projects in `playwright.config.js`. CI runs the suite as a
+blocking job and lowers the unprivileged port floor so the `< 1024` fetch route
+is exercised end-to-end; where a low port can't be bound (e.g. macOS), that one
+test skips itself.
