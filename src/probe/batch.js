@@ -10,11 +10,8 @@ const ICE_CONCURRENCY = 16;
  * @typedef {{host: string, port: number, state: "open"|"open-silent"|"closed"|"restricted", durationMs: number}} ProbeResult
  */
 
-/**
- * Run `task` over `items` with a bounded worker pool: each worker takes the
- * next item as soon as it finishes its previous one, so a single slow item
- * never stalls the rest (no batch barrier).
- */
+// Run tasks through a bounded number of workers. Workers claim indices before
+// awaiting, so each item is claimed once while results retain input order.
 async function runPool(items, concurrency, task) {
 	const results = new Array(items.length);
 	let next = 0;
@@ -27,40 +24,30 @@ async function runPool(items, concurrency, task) {
 		}
 	}
 
+	// For non-empty input, never spawn more workers than items. Empty input uses
+	// one no-op worker and still resolves to an empty result array.
 	const workerCount = Math.max(1, Math.min(concurrency, items.length));
 	await Promise.all(Array.from({ length: workerCount }, worker));
 	return results;
 }
 
-/**
- * Probe ports, routing each to the best channel for it and keeping the
- * page responsive: fetch for ports < 1024 (libwebrtc rejects ICE candidates
- * to low ports on local addresses), batched ICE above. Ports on Chromium's
- * restricted list (net/base/port_util.cc) cannot be scanned at all and are
- * reported as "restricted" without probing. The two channels run
- * concurrently and use independent resource pools (HTTP sockets vs WebRTC
- * P2P sockets), so neither starves the other.
- *
- * @param {string} host Hostname or IP literal.
- * @param {readonly number[]} ports Ports to probe.
- * @param {object} [options]
- * @param {number} [options.fetchTimeoutMs] Forwarded to probeWithFetch.
- * @param {number} [options.iceTimeoutMs] Forwarded to probeBatchWithIce.
- * @param {(progress: {completed: number, total: number, result: ProbeResult}) => void} [options.onProgress]
- *   Called as each probe settles — fetch probes report individually, ICE
- *   probes report when their 64-port batch completes.
- * @returns {Promise<ProbeResult[]>} Results in the same order as `ports`.
- */
 export async function probeBatches(host, ports, options = {}) {
 	const { fetchTimeoutMs, iceTimeoutMs, onProgress } = options;
 	const total = ports.length;
 	let completed = 0;
+
+	// Both worker pools report through the same counter. ICE results reach this
+	// function together when their shared connection finishes.
 	const track = (result) => {
 		completed += 1;
 		onProgress?.({ completed, total, result });
 		return result;
 	};
 
+	// libwebrtc rejects passive remote candidates below port 1024, except ports
+	// 80 and 443 on public addresses. Route the entire low range through fetch so
+	// behavior does not depend on classifying the target address. Remove static
+	// Chromium-restricted ports because both fetch and its P2P path reject them.
 	const lowPorts = [];
 	const highPorts = [];
 	for (const port of ports) {
@@ -68,12 +55,17 @@ export async function probeBatches(host, ports, options = {}) {
 		(port < 1024 ? lowPorts : highPorts).push(port);
 	}
 
+	// Put at most 64 remote candidates in each peer connection. This amortizes
+	// connection setup and, more importantly, shares one deadline across closed
+	// ports instead of waiting once per port.
 	const highBatches = Array.from(
 		{ length: Math.ceil(highPorts.length / ICE_BATCH_SIZE) },
 		(_, index) =>
 			highPorts.slice(index * ICE_BATCH_SIZE, (index + 1) * ICE_BATCH_SIZE),
 	);
 
+	// Start the fetch and ICE work together, with a separate concurrency limit
+	// for each channel so scheduling in one does not gate scheduling in the other.
 	const [lowResults, highResults] = await Promise.all([
 		runPool(lowPorts, FETCH_CONCURRENCY, async (port) =>
 			track(await probeWithFetch(host, port, fetchTimeoutMs)),
@@ -83,8 +75,8 @@ export async function probeBatches(host, ports, options = {}) {
 		).then((batches) => batches.flat()),
 	]);
 
-	// Merge back into input order; restricted ports are reported without
-	// probing.
+	// Each pool preserves its filtered input order. Walk the original list to
+	// reinsert restricted ports and restore the caller's ordering.
 	const results = [];
 	let low = 0;
 	let high = 0;

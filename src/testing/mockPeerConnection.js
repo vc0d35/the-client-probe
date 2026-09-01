@@ -1,12 +1,6 @@
-/**
- * @param {object} [options]
- * @param {number} [options.requestsSent=0] requestsSent on the fake pair.
- * @param {number} [options.remotePort] When set, the fake also reports a
- *   remote-candidate with this port and links the pair to it, so batched
- *   probes can attribute the traffic to a port.
- * @param {(instances: object[]) => Promise<unknown>} fn The test body; gets
- *   every created fake instance for inspection.
- */
+// Replace the browser API with the smallest stateful implementation needed by
+// the probe. The returned stats preserve the real remote-candidate/candidate-
+// pair join so tests exercise port attribution instead of bypassing it.
 export async function withFakePeerConnection(
 	{ requestsSent = 0, remotePort } = {},
 	fn,
@@ -16,6 +10,8 @@ export async function withFakePeerConnection(
 
 	globalThis.RTCPeerConnection = class {
 		constructor() {
+			// Retain descriptions and lifecycle state for assertions made after the
+			// probe closes the connection.
 			this.localDescription = null;
 			this.remoteDescription = null;
 			this.closed = false;
@@ -38,6 +34,8 @@ export async function withFakePeerConnection(
 
 		async getStats() {
 			const entries = [];
+			// Omitting the remote candidate simulates a pair that cannot be
+			// attributed to a target port.
 			if (remotePort !== undefined) {
 				entries.push([
 					"remote",
@@ -63,6 +61,7 @@ export async function withFakePeerConnection(
 	try {
 		return await fn(instances);
 	} finally {
+		// Avoid leaking the fake into subsequent tests.
 		globalThis.RTCPeerConnection = original;
 	}
 }
