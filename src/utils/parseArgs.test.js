@@ -15,8 +15,8 @@ test("rejects invalid port arguments", () => {
 	assert.throws(() => parseArgs([80, 443.5]), RangeError);
 	assert.throws(() => parseArgs(443, 80), RangeError);
 	assert.throws(() => parseArgs([80], 443), TypeError);
-	// @ts-expect-error Ignoring this in TS-world so IDEs don't complain about this line
+	// @ts-expect-error verify the runtime guard rejects a missing argument
 	assert.throws(() => parseArgs(), TypeError);
-	// @ts-expect-error Ignoring this in TS-world so IDEs don't complain about this line
+	// @ts-expect-error verify the runtime guard rejects a non-array/number argument
 	assert.throws(() => parseArgs("80"), TypeError);
 });
