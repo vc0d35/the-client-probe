@@ -1,7 +1,10 @@
 const MIN_PORT = 0;
 const MAX_PORT = 65535;
 
-// TCP and UDP port fields are unsigned 16-bit integers.
+/**
+ * @param {unknown} port
+ * @returns {port is number}
+ */
 function isValidPort(port) {
 	return (
 		typeof port === "number" &&
@@ -11,6 +14,9 @@ function isValidPort(port) {
 	);
 }
 
+/**
+ * @param {readonly number[]} ports
+ */
 function validatePorts(ports) {
 	for (const port of ports) {
 		if (!isValidPort(port)) {
@@ -21,9 +27,13 @@ function validatePorts(ports) {
 	}
 }
 
+/**
+ * @param {readonly number[] | number} portsOrMin Ports to probe, or the
+ * minimum port in a range.
+ * @param {number} [max] Maximum port in a range.
+ * @returns {number[]}
+ */
 export function parseArgs(portsOrMin, max) {
-	// Array input is copied after validation so later caller mutations cannot
-	// change work already handed to the scanner.
 	if (typeof portsOrMin !== "number") {
 		if (!Array.isArray(portsOrMin)) {
 			throw new TypeError("ports must be an array or min/max numbers");
@@ -37,8 +47,6 @@ export function parseArgs(portsOrMin, max) {
 		return [...portsOrMin];
 	}
 
-	// Numeric input represents an inclusive range, so both bounds are required
-	// and independently validated before allocating the result.
 	if (!isValidPort(portsOrMin)) {
 		throw new RangeError(
 			`Port must be an integer between ${MIN_PORT} and ${MAX_PORT}: ${portsOrMin}`,
