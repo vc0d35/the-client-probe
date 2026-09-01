@@ -1,6 +1,14 @@
-// Mirror Chromium's static kRestrictedPorts so the scheduler can short-circuit
-// requests the browser will reject. Runtime feature parameters can add generic
-// or localhost-only restrictions that this static set cannot represent.
+/**
+ * Chromium's restricted-port list (kRestrictedPorts in
+ * net/base/port_util.cc). Requests to these ports are blocked before any
+ * network I/O — fetch fails with ERR_UNSAFE_PORT and ICE candidates to
+ * them are killed at the P2P socket layer — so they are reported as
+ * "restricted" without probing.
+ *
+ * Chromium additionally enforces a second, server-pushed blocklist for
+ * localhost (kRestrictAbusePortsOnLocalhost, enabled by default, contents
+ * not in the source tree) which this static copy cannot account for.
+ */
 export const RESTRICTED_PORTS = new Set([
 	0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77,
 	79, 87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135,

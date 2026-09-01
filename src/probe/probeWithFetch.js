@@ -1,11 +1,13 @@
 const FETCH_TIMEOUT_MS = 2000;
 
-// Keep result values centralized so both probe implementations classify their
-// observations with the same strings.
+/**
+ * Port states observable from a probe.
+ */
 export const PortState = Object.freeze({
 	Open: "open",
 	OpenSilent: "open-silent",
 	Closed: "closed",
+	/** On Chromium's restricted-port list; cannot be scanned at all. */
 	Restricted: "restricted",
 });
 
@@ -13,12 +15,29 @@ export const PortState = Object.freeze({
  * @typedef {{host: string, port: number, state: "open"|"open-silent"|"closed"|"restricted", durationMs: number}} ProbeResult
  */
 
+/**
+ * Probe one TCP port with fetch.
+ *
+ * A resolved fetch means the service responded. A TimeoutError (from the
+ * AbortSignal.timeout signal) means the connection stayed open without
+ * response bytes. Any other rejection is classified as closed — but note
+ * rejections also happen for OPEN ports whose response is CORP/ORB-blocked
+ * or not valid HTTP (e.g. SSH banners); those are false negatives this
+ * channel cannot avoid. probeWithIce (ports >= 1024) is immune to them.
+ * Ports on Chromium's restricted list also misreport as closed when
+ * probed directly (ERR_UNSAFE_PORT is indistinguishable from a refusal);
+ * probeBatches short-circuits those to "restricted".
+ *
+ * @param {string} host Hostname or IP literal.
+ * @param {number} port TCP port number.
+ * @param {number} [timeoutMs=2000] How long to wait for response bytes
+ *   before classifying the port as open-silent. 500 ms is plenty on
+ *   loopback.
+ * @returns {Promise<ProbeResult>}
+ */
 export async function probeWithFetch(host, port, timeoutMs = FETCH_TIMEOUT_MS) {
 	const started = performance.now();
 	try {
-		// no-cors avoids requiring a successful CORS check; a successful cross-
-		// origin response is exposed only as opaque. no-store bypasses the HTTP
-		// cache, though browser policies and intermediaries can still stop the load.
 		await fetch(`http://${host}:${port}/`, {
 			mode: "no-cors",
 			cache: "no-store",
@@ -32,10 +51,6 @@ export async function probeWithFetch(host, port, timeoutMs = FETCH_TIMEOUT_MS) {
 			durationMs: performance.now() - started,
 		};
 	} catch (error) {
-		// The timeout signal is the only rejection initiated here. It means only
-		// that fetch did not settle within the observation window; it does not prove
-		// where the request stalled. Every other rejection—network, HTTP parsing, or
-		// browser policy—is collapsed into the same closed result.
 		return {
 			host,
 			port,

@@ -15,8 +15,8 @@ test("rejects invalid port arguments", () => {
 	assert.throws(() => parseArgs([80, 443.5]), RangeError);
 	assert.throws(() => parseArgs(443, 80), RangeError);
 	assert.throws(() => parseArgs([80], 443), TypeError);
-	// @ts-expect-error Deliberately exercise the missing-argument runtime path.
+	// @ts-expect-error Ignoring this in TS-world so IDEs don't complain about this line
 	assert.throws(() => parseArgs(), TypeError);
-	// @ts-expect-error Deliberately exercise an invalid runtime type.
+	// @ts-expect-error Ignoring this in TS-world so IDEs don't complain about this line
 	assert.throws(() => parseArgs("80"), TypeError);
 });
