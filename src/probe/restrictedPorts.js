@@ -1,8 +1,6 @@
-// Chromium's static kRestrictedPorts (net/base/port_util.cc): requests to these
-// are blocked before any network I/O (fetch -> ERR_UNSAFE_PORT, ICE candidates
-// killed at the socket layer), so we report them "restricted" without probing.
-// Chromium also enforces a second, server-pushed localhost blocklist whose
-// contents aren't in the source tree, which this static copy can't mirror.
+// Chromium's kRestrictedPorts (net/base/port_util.cc). Requests to these fail
+// before any network I/O on both channels. Chromium also applies a server-pushed
+// localhost blocklist that is not in the source tree and cannot be mirrored here.
 export const RESTRICTED_PORTS = new Set([
 	0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77,
 	79, 87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135,

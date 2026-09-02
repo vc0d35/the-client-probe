@@ -43,10 +43,7 @@ export interface ScanProgress {
 export interface ScanOptions {
 	/** Hang timeout for fetch probes (ports < 1024). Default 2000. */
 	fetchTimeoutMs?: number;
-	/**
-	 * Per-batch deadline for ICE probes (ports >= 1024). Default is adaptive
-	 * (batchSize * 100 + 500 ms) to cover Chromium's ~65 ms/candidate pacing.
-	 */
+	/** Per-batch deadline for ICE probes (ports >= 1024). Default batchSize * 100 + 500. */
 	iceTimeoutMs?: number;
 	onProgress?: (progress: ScanProgress) => void;
 }

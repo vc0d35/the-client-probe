@@ -1,10 +1,6 @@
-// scanPorts orchestration in a real Chromium: channel routing, restricted-port
-// handling, input-order preservation, and progress reporting over one call.
-
 import { expect, test } from "./fixtures.js";
 
-// A member of Chromium's kRestrictedPorts (see RESTRICTED_PORTS): reported
-// without any probe, so no listener is needed.
+// In Chromium's restricted list, so no listener is needed.
 const RESTRICTED_PORT = 6000;
 
 test.describe("scanPorts orchestration", () => {
@@ -28,7 +24,6 @@ test.describe("scanPorts orchestration", () => {
 			{ host: servers.host, ports, iceTimeout: 4000 },
 		);
 
-		// Results come back in the caller's input order.
 		expect(results.map((r) => r.port)).toEqual(ports);
 
 		const stateByPort = Object.fromEntries(
@@ -36,9 +31,8 @@ test.describe("scanPorts orchestration", () => {
 		);
 		expect(stateByPort[servers.httpOpen]).toBe("open"); // >= 1024 -> ICE
 		expect(stateByPort[servers.closedHigh]).toBe("closed");
-		expect(stateByPort[RESTRICTED_PORT]).toBe("restricted"); // reported unprobed
+		expect(stateByPort[RESTRICTED_PORT]).toBe("restricted");
 
-		// Progress fires once per port, with a monotonic count and a fixed total.
 		expect(progress.map((p) => p.total)).toEqual(ports.map(() => ports.length));
 		expect(progress.map((p) => p.completed)).toEqual(
 			ports.map((_, index) => index + 1),
@@ -61,8 +55,6 @@ test.describe("scanPorts orchestration", () => {
 				}),
 			{ host: servers.host, port: servers.lowOpen, fetchTimeout: 1500 },
 		);
-		// A < 1024 port that a real HTTP server answers must resolve as open via
-		// the fetch route — the true routing the unit suite can only mock.
 		expect(result).toMatchObject({ port: servers.lowOpen, state: "open" });
 	});
 });

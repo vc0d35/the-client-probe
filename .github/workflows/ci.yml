@@ -31,12 +31,9 @@ jobs:
 
       - run: npm ci
 
-      # Chrome only for now; Firefox/WebKit are added as Playwright projects later.
       - run: npx playwright install --with-deps chromium
 
-      # Allow binding real ports < 1024 so the scanPorts fetch-route test exercises
-      # the true "< 1024 -> fetch" routing instead of skipping. Linux-only knob;
-      # off CI the test skips itself.
+      # Let the e2e suite bind ports < 1024 so the fetch route runs instead of skipping.
       - run: sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1
 
       - run: npm run test:e2e

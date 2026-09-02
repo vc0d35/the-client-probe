@@ -2,10 +2,9 @@ import { PortState } from "./probeWithFetch.js";
 
 const POLL_INTERVAL_MS = 100;
 
-// Forge an SDP answer (there is no second peer) that plants one passive ICE-TCP
+// There is no second peer: the answer is forged to plant one passive ICE-TCP
 // candidate per target port. libwebrtc rejects candidates to ports < 1024 on
-// local addresses (VerifyCandidate), which is why batch.js sends the low range
-// through fetch instead.
+// local addresses, which is why batch.js sends those through fetch.
 function buildAnswerSdp({ mid, host, ports }) {
 	const lines = [
 		"v=0",
@@ -42,10 +41,8 @@ async function startChecks(host, ports) {
 	return connection;
 }
 
-// Open-port oracle: a candidate pair counts only once it has actually sent STUN
-// traffic (requestsSent > 0). Pairs are formed before connectivity is checked,
-// so pair existence alone proves nothing — a blocked socket leaves its pair
-// waiting forever.
+// A pair only proves the port is open once it has sent STUN traffic
+// (requestsSent > 0); pairs exist before any connectivity check runs.
 async function collectReachablePorts(connection, reachable) {
 	const stats = await connection.getStats();
 	const remotePorts = new Map();
@@ -74,10 +71,6 @@ export async function probeWithIce(host, port, timeoutMs) {
 	return result;
 }
 
-// One RTCPeerConnection carries the whole batch (one planted candidate per
-// port), so a batch of closed ports costs a single shared deadline instead of
-// one timeout each. "closed" is an absence-of-traffic verdict, so a silently
-// filtered port is indistinguishable from a refused one.
 export async function probeBatchWithIce(host, ports, timeoutMs) {
 	if (typeof RTCPeerConnection === "undefined") {
 		throw new Error(
@@ -86,8 +79,7 @@ export async function probeBatchWithIce(host, ports, timeoutMs) {
 	}
 
 	const deadline = timeoutMs ?? adaptiveTimeoutMs(ports.length);
-	// A Set collapses duplicate ports; without this the loop below would
-	// never exit early for duplicated input and always burn the deadline.
+	// Deduplicate so the loop below can exit early on repeated input.
 	const pending = new Set(ports).size;
 	const started = performance.now();
 	const connection = await startChecks(host, ports);

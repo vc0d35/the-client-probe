@@ -7,16 +7,12 @@ export const PortState = Object.freeze({
 	Restricted: "restricted",
 });
 
-// Classify a port by the outcome of a no-cors fetch: resolved -> open,
-// TimeoutError (the abort signal) -> open-silent, any other rejection -> closed.
-// That last bucket is lossy: an open port whose response is CORP/ORB-blocked or
-// not valid HTTP (SSH banners, binary protocols) also rejects and misreports as
-// closed — which is why ports >= 1024 use the ICE channel instead.
+// A rejection does not prove the port is closed: non-HTTP services and
+// CORP/ORB-blocked responses reject too. That is why ports >= 1024 use ICE.
 export async function probeWithFetch(host, port, timeoutMs = FETCH_TIMEOUT_MS) {
 	const started = performance.now();
 	try {
-		// no-cors so a cross-origin response resolves (opaque) rather than failing
-		// the CORS check; no-store to bypass the HTTP cache.
+		// no-cors: a cross-origin response resolves (opaque) instead of failing CORS.
 		await fetch(`http://${host}:${port}/`, {
 			mode: "no-cors",
 			cache: "no-store",
