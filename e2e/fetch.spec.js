@@ -1,10 +1,6 @@
-// Fetch channel: real no-cors fetch classification in a real Chromium against
-// real loopback listeners — the three outcomes the mocked unit suite fakes.
-
 import { expect, test } from "./fixtures.js";
 
-// Short hang timeout so the open-silent case (which waits for the abort) stays
-// fast; the closed case refuses instantly regardless.
+// Short so the open-silent case, which waits for the abort, stays fast.
 const FETCH_TIMEOUT_MS = 800;
 
 test.describe("fetch channel", () => {

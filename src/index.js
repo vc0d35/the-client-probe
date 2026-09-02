@@ -6,8 +6,7 @@ export { probeBatchWithIce, probeWithIce } from "./probe/probeWithIce.js";
 export { RESTRICTED_PORTS } from "./probe/restrictedPorts.js";
 
 export async function scanPorts(host, portsOrMin, max, options = {}) {
-	// Two call shapes: (host, ports[], options) and (host, min, max, options).
-	// In the array form the third argument is the options object — shift it.
+	// (host, ports[], options) form: the options object arrives in the max slot.
 	if (typeof max === "object" && max !== null) {
 		options = max;
 		max = undefined;

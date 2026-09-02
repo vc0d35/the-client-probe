@@ -1,6 +1,5 @@
-// Minimal RTCPeerConnection fake. getStats reproduces the real remote-candidate
-// / candidate-pair join so tests exercise port attribution instead of bypassing
-// it.
+// getStats mirrors the real remote-candidate / candidate-pair split so tests
+// cover the port attribution join.
 export async function withFakePeerConnection(
 	{ requestsSent = 0, remotePort } = {},
 	fn,

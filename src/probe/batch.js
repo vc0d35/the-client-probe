@@ -6,8 +6,6 @@ const FETCH_CONCURRENCY = 128;
 const ICE_BATCH_SIZE = 64;
 const ICE_CONCURRENCY = 16;
 
-// Bounded worker pool: each worker claims the next index as soon as it frees up,
-// so a slow item never stalls the rest. Results keep input order.
 async function runPool(items, concurrency, task) {
 	const results = new Array(items.length);
 	let next = 0;
@@ -25,11 +23,8 @@ async function runPool(items, concurrency, task) {
 	return results;
 }
 
-// Route each port to the channel that can reach it: fetch below 1024 (libwebrtc
-// rejects ICE candidates to low local ports), batched ICE above, restricted
-// ports reported without probing. The two channels run concurrently on
-// independent socket pools so neither starves the other; results stay in the
-// caller's order.
+// Ports < 1024 go through fetch because libwebrtc rejects ICE candidates to
+// low ports on local addresses. Restricted ports are never probed.
 export async function probeBatches(host, ports, options = {}) {
 	const { fetchTimeoutMs, iceTimeoutMs, onProgress } = options;
 	const total = ports.length;
@@ -62,7 +57,6 @@ export async function probeBatches(host, ports, options = {}) {
 		).then((batches) => batches.flat()),
 	]);
 
-	// Reinsert restricted ports and restore the caller's original order.
 	const results = [];
 	let low = 0;
 	let high = 0;

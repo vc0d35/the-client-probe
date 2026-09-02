@@ -30,8 +30,6 @@ test("probeWithFetch classifies an abort timeout as open-silent", async () => {
 	const timeoutMs = 50;
 	await withMockFetch(
 		(_url, options) =>
-			// Never responds; rejects when the probe's AbortSignal.timeout fires,
-			// mirroring how a real fetch surfaces the timeout.
 			new Promise((_, reject) => {
 				options.signal.addEventListener("abort", () =>
 					reject(options.signal.reason),
@@ -41,11 +39,8 @@ test("probeWithFetch classifies an abort timeout as open-silent", async () => {
 			const result = await probeWithFetch("127.0.0.1", 8080, timeoutMs);
 
 			assert.equal(result.state, PortState.OpenSilent);
-			// AbortSignal.timeout(t) can fire a hair before performance.now()
-			// measures t — Node truncates timer delays to whole milliseconds and
-			// reads a slightly different clock — so a strict `>= timeoutMs` is flaky
-			// on slower/virtualized CI clocks. Allow a small tolerance while still
-			// proving the probe waited out the timeout rather than returning at once.
+			// AbortSignal.timeout can fire slightly before performance.now() measures
+			// the full delay (Node truncates timer delays to whole ms), hence the slack.
 			assert.ok(
 				result.durationMs >= timeoutMs - 5,
 				`waits out the timeout (got ${result.durationMs}ms)`,

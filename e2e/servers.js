@@ -1,7 +1,5 @@
-// Hermetic target servers for the e2e suite. Every server binds on loopback so
-// the whole matrix runs offline, and the page is served from 127.0.0.1 too so
-// the browser treats it as a secure context (WebRTC + fetch behave normally and
-// Local Network Access never engages — the gate is strictly public -> local).
+// All servers bind loopback. The page is served from 127.0.0.1 as well so it
+// is a secure context and Local Network Access never engages.
 
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -12,8 +10,6 @@ import { fileURLToPath } from "node:url";
 
 const HOST = "127.0.0.1";
 
-// The repo root, so the page server can serve both e2e/harness.html and the
-// library's source module tree (/src/index.js and its relative imports).
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 const MIME = {
@@ -23,10 +19,9 @@ const MIME = {
 	".css": "text/css; charset=utf-8",
 };
 
-// Low ports (< 1024) that are NOT on Chromium's restricted list, so a real
-// fetch to one is not short-circuited. Only reachable when the runtime can bind
-// privileged ports (CI lowers net.ipv4.ip_unprivileged_port_start); otherwise
-// low-port assertions skip.
+// Ports < 1024 that are not on Chromium's restricted list. Binding them needs
+// privileges (CI lowers net.ipv4.ip_unprivileged_port_start); otherwise the
+// low-port test skips.
 const LOW_PORT_CANDIDATES = [888, 999, 900, 700, 456, 321];
 
 function listen(server, port) {
@@ -49,8 +44,7 @@ function closeServer(server) {
 	return new Promise((resolve) => server.close(() => resolve()));
 }
 
-// Static file server rooted at the repo. Serves the harness page and the
-// library module to the browser over one origin.
+// Serves e2e/harness.html and the /src module tree from one origin.
 async function startPageServer() {
 	const server = createHttpServer(async (req, res) => {
 		try {
@@ -81,8 +75,7 @@ async function startPageServer() {
 	return { port, close: () => closeServer(server) };
 }
 
-// An HTTP server that answers 200. Doubles as the ICE-open target: libwebrtc
-// only needs the TCP connection to be accepted to record requestsSent > 0.
+// Also the ICE-open target: libwebrtc only needs the TCP connect to succeed.
 async function startHttpOpen() {
 	const server = createHttpServer((_req, res) => {
 		res.writeHead(200, { "content-type": "text/plain" }).end("ok");
@@ -91,8 +84,7 @@ async function startHttpOpen() {
 	return { port, close: () => closeServer(server) };
 }
 
-// Accepts TCP connections but never writes a byte, so a fetch to it hangs until
-// the caller's abort timeout fires -> open-silent.
+// Accepts connections but never responds: a fetch hangs until its abort fires.
 async function startSilent() {
 	const sockets = new Set();
 	const server = createNetServer((socket) => {
@@ -110,8 +102,7 @@ async function startSilent() {
 	};
 }
 
-// Bind an ephemeral port, read it, then release it — leaving a port the OS is
-// unlikely to reassign immediately. Connections to it are refused -> closed.
+// Bind an ephemeral port and release it; connections to it are then refused.
 async function findClosedPort() {
 	const server = createNetServer();
 	const port = await listen(server, 0);
@@ -119,8 +110,6 @@ async function findClosedPort() {
 	return port;
 }
 
-// Try to bind an open HTTP server on a non-restricted low port. Succeeds only
-// where privileged binds are allowed; reports availability so tests can skip.
 async function startLowOpen() {
 	for (const candidate of LOW_PORT_CANDIDATES) {
 		const server = createHttpServer((_req, res) => {
@@ -140,7 +129,6 @@ async function startLowOpen() {
 	return { port: null, available: false, close: async () => {} };
 }
 
-// Start the full set once and return their ports plus a single teardown.
 export async function startServers() {
 	const [page, httpOpen, silent, lowOpen] = await Promise.all([
 		startPageServer(),

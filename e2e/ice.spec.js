@@ -1,11 +1,6 @@
-// ICE channel (ports >= 1024): the forged-SDP, ICE-TCP technique run against a
-// real Chromium and real loopback listeners — the behavior the mocked unit
-// suite cannot reach.
-
 import { expect, test } from "./fixtures.js";
 
-// Generous per-call deadline so an accepted connection has time to register a
-// connectivity check before classification, independent of CI load.
+// Headroom for CI load; the accepted connection must register a check in time.
 const ICE_TIMEOUT_MS = 4000;
 
 test.describe("ICE channel", () => {
