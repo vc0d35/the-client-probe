@@ -23,8 +23,21 @@ async function runPool(items, concurrency, task) {
 	return results;
 }
 
-// Ports < 1024 go through fetch because libwebrtc rejects ICE candidates to
-// low ports on local addresses. Restricted ports are never probed.
+// Only Chromium's ICE stack dials loopback candidates; other engines drop them,
+// so their loopback high ports fall back to fetch (which on those engines
+// resolves for any open port, not just HTTP).
+function isChromium() {
+	const brands = globalThis.navigator?.userAgentData?.brands;
+	if (brands) return brands.some((brand) => brand.brand === "Chromium");
+	return /Chrome\//.test(globalThis.navigator?.userAgent ?? "");
+}
+
+const isLoopbackHost = (host) =>
+	host === "localhost" || host === "::1" || host.startsWith("127.");
+
+// Route each non-restricted port: fetch below 1024 (browsers reject ICE
+// candidates to low local ports), batched ICE above. Where ICE can't reach the
+// host's loopback, high ports use fetch too.
 export async function probeBatches(host, ports, options = {}) {
 	const { fetchTimeoutMs, iceTimeoutMs, onProgress } = options;
 	const total = ports.length;
@@ -35,38 +48,45 @@ export async function probeBatches(host, ports, options = {}) {
 		return result;
 	};
 
-	const lowPorts = [];
-	const highPorts = [];
+	const iceCanReachHost = isChromium() || !isLoopbackHost(host);
+	const routeToFetch = (port) => port < 1024 || !iceCanReachHost;
+
+	const fetchPorts = [];
+	const icePorts = [];
 	for (const port of ports) {
 		if (RESTRICTED_PORTS.has(port)) continue;
-		(port < 1024 ? lowPorts : highPorts).push(port);
+		(routeToFetch(port) ? fetchPorts : icePorts).push(port);
 	}
 
-	const highBatches = Array.from(
-		{ length: Math.ceil(highPorts.length / ICE_BATCH_SIZE) },
+	const iceBatches = Array.from(
+		{ length: Math.ceil(icePorts.length / ICE_BATCH_SIZE) },
 		(_, index) =>
-			highPorts.slice(index * ICE_BATCH_SIZE, (index + 1) * ICE_BATCH_SIZE),
+			icePorts.slice(index * ICE_BATCH_SIZE, (index + 1) * ICE_BATCH_SIZE),
 	);
 
-	const [lowResults, highResults] = await Promise.all([
-		runPool(lowPorts, FETCH_CONCURRENCY, async (port) =>
+	const [fetchResults, iceResults] = await Promise.all([
+		runPool(fetchPorts, FETCH_CONCURRENCY, async (port) =>
 			track(await probeWithFetch(host, port, fetchTimeoutMs)),
 		),
-		runPool(highBatches, ICE_CONCURRENCY, async (batch) =>
+		runPool(iceBatches, ICE_CONCURRENCY, async (batch) =>
 			(await probeBatchWithIce(host, batch, iceTimeoutMs)).map(track),
 		).then((batches) => batches.flat()),
 	]);
 
 	const results = [];
-	let low = 0;
-	let high = 0;
+	let fetchIndex = 0;
+	let iceIndex = 0;
 	for (const port of ports) {
 		if (RESTRICTED_PORTS.has(port)) {
 			results.push(
 				track({ host, port, state: PortState.Restricted, durationMs: 0 }),
 			);
 		} else {
-			results.push(port < 1024 ? lowResults[low++] : highResults[high++]);
+			results.push(
+				routeToFetch(port)
+					? fetchResults[fetchIndex++]
+					: iceResults[iceIndex++],
+			);
 		}
 	}
 	return results;

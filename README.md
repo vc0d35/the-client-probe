@@ -4,20 +4,24 @@ A TCP port scanner that runs in the browser. Vanilla JavaScript, no build
 step, no runtime dependencies. It scans localhost, LAN hosts, or any
 routable IP from the visitor's browser.
 
-Demo: <https://the-client-probe.vercel.app/example/index.html> (use Chrome).
+Demo: <https://the-client-probe.vercel.app/example/index.html> (Chrome or
+Firefox).
 
 ## Browser support
 
-| Browser | Ports < 1024 (fetch) | Ports >= 1024 (ICE) |
-|---|---|---|
-| Chrome / Chromium | Yes | Yes |
-| Firefox | Untested | Untested |
-| Safari | Untested | Untested |
+| Browser | < 1024 | Loopback >= 1024 | LAN / remote >= 1024 |
+|---|---|---|---|
+| Chrome / Chromium | fetch | ICE | ICE |
+| Firefox | fetch | fetch | ICE |
+| Safari | fetch | fetch | untested |
 
-Verified against Chrome 150 on macOS, and in CI against Playwright's
-Chromium on Linux. The ICE channel depends on Chromium's WebRTC stack and
-has not been checked on other engines; on Firefox or Safari, ports >= 1024
-may be reported `closed` regardless of their real state.
+Chromium is fully verified (Chrome 150 on macOS, Playwright Chromium on
+Linux in CI). Firefox is supported through a different split: its WebRTC
+stack refuses to dial loopback candidates, so loopback ports >= 1024 fall
+back to fetch, while LAN and remote ports >= 1024 use ICE as on Chromium.
+Firefox's fetch is more lenient than Chromium's, so that fallback still
+detects non-HTTP services (see *How it works*). Safari is untested and
+routes like Firefox. The engine is chosen at runtime from `navigator`.
 
 ## Install
 
@@ -41,7 +45,7 @@ Every result is `{ host, port, state, durationMs }`. `state` is one of:
 
 | State | Meaning |
 |---|---|
-| `open` | The port accepted a TCP connection (ICE) or returned an HTTP response (fetch). |
+| `open` | The port accepted a TCP connection (ICE) or responded over it (fetch). |
 | `open-silent` | The port accepted a TCP connection but sent nothing before the timeout. Fetch channel only. |
 | `closed` | The connection was refused, or no traffic was seen before the deadline. |
 | `restricted` | The port is on Chromium's blocklist. Reported without probing. |
@@ -81,11 +85,11 @@ RESTRICTED_PORTS.has(6000); // true
 PortState.Open;             // "open"
 ```
 
-`scanPorts` skips restricted ports and routes by port number. The
-lower-level functions do not: `probeWithFetch` works on any port, and
-`probeWithIce` / `probeBatchWithIce` work only on ports >= 1024 (Chromium
-rejects ICE candidates to lower local ports, so they always come back
-`closed`).
+`scanPorts` skips restricted ports and routes by port number and target.
+The lower-level functions do not: `probeWithFetch` works on any port, and
+`probeWithIce` / `probeBatchWithIce` work on ports >= 1024 (browsers reject
+ICE candidates to lower local ports) and, on non-Chromium engines, only for
+non-loopback hosts. Prefer `scanPorts` for cross-engine coverage.
 
 ## Examples
 
@@ -143,10 +147,12 @@ const results = await scanPorts("203.0.113.10", [22, 80, 443, 8080, 9999], {
 
 ## How it works
 
-Ports are split by number. Ports below 1024 go through `fetch`, ports at or
-above 1024 go through WebRTC ICE. Restricted ports are reported as
-`restricted` without any network I/O. The two channels run concurrently and
-results are returned in the caller's order.
+Ports are split by number and by target. Ports below 1024 go through
+`fetch`; ports at or above 1024 go through WebRTC ICE, except that
+non-Chromium engines route loopback high ports through fetch too, because
+their ICE cannot reach loopback. Restricted ports are reported without any
+network I/O. The channels run concurrently and results keep the caller's
+order.
 
 ### Fetch channel (ports < 1024)
 
@@ -157,27 +163,32 @@ classifies the port:
 - `TimeoutError` from the abort signal: `open-silent`
 - Any other rejection: `closed`
 
-This is fast, about 2 ms per closed port on loopback, but the `closed`
-bucket is lossy. An open port that speaks something other than HTTP (SSH,
-databases, binary protocols) or whose HTTP response is blocked by
-CORP/ORB also rejects and is reported `closed`. That is why ports >= 1024
-use ICE instead. Ports below 1024 use fetch only because Chromium's WebRTC
-stack refuses ICE candidates to low local ports.
+This is fast, about 2 ms per closed port on loopback. On Chromium the
+`closed` bucket is lossy: an open port that speaks something other than HTTP
+or whose response is blocked by CORP/ORB also rejects and is reported
+`closed`, which is why Chromium uses ICE above 1024. Firefox's `no-cors`
+fetch is more lenient and resolves for any open port that sends bytes, HTTP
+or not, so its loopback fallback keeps that coverage without ICE. A port
+that accepts a connection then stays silent reads as `open-silent` on both;
+one that accepts then immediately resets reads as `closed`.
 
 ### ICE channel (ports >= 1024)
 
 An `RTCPeerConnection` is created with a data channel, and a forged SDP
 answer plants one passive ICE-TCP candidate per target port. There is no
-real peer. Chromium's ICE agent opens a TCP connection to each candidate
+real peer. The browser's ICE agent opens a TCP connection to each candidate
 and sends STUN connectivity checks. The library polls `getStats()` and
-treats a candidate pair with `requestsSent > 0` as proof that the TCP
-connection was accepted, so the port is `open` regardless of the protocol
-behind it. No traffic by the deadline means `closed`.
+treats a candidate pair whose check is in flight (state `in-progress` or
+`succeeded`) as proof the connection was accepted, so the port is `open`
+regardless of the protocol behind it. This state signal works on both
+engines; `requestsSent`, the older signal, is Chromium-only. No such pair by
+the deadline means `closed`. Firefox will not dial loopback candidates, so
+loopback high ports never reach this channel.
 
 One connection carries up to 64 ports and 16 connections run in parallel.
-Chromium paces ICE-TCP checks at roughly 65 ms per candidate per
-connection, which is why the default batch deadline grows with batch size
-and why a batch of closed ports always costs the full deadline.
+Browsers pace ICE-TCP checks (roughly 65 ms per candidate on Chromium),
+which is why the default batch deadline grows with batch size and why a
+batch of closed ports always costs the full deadline.
 
 ### Restricted ports
 
@@ -200,9 +211,14 @@ static list.
   is unanswered the fetch hangs and reports `open-silent`, if granted it
   reports `open`, if denied it reports `closed`. The ICE channel is not
   gated. From localhost or LAN origins nothing is gated.
+- **Firefox loopback uses fetch.** Firefox's ICE cannot dial loopback, so
+  loopback ports >= 1024 fall back to fetch. That is silent and handles
+  non-HTTP services, but a port that accepts then resets without sending is
+  read as `closed`. LAN and remote high ports use ICE as on Chromium.
 - **Mixed content.** An HTTPS page cannot fetch plain HTTP from a LAN
   address, so the fetch channel does not work against LAN targets from an
-  HTTPS origin. Loopback is exempt.
+  HTTPS origin. Loopback is exempt. This is a further reason LAN high ports
+  use ICE, which is unaffected.
 - **Filtered ports look different per channel.** Off loopback, a firewall
   that silently drops packets reports `closed` on ICE and `open-silent` on
   fetch.
@@ -222,15 +238,16 @@ static list.
 
 ```sh
 npm test          # unit tests (node:test, mocked fetch and RTCPeerConnection)
-npm run test:e2e  # Playwright tests in real Chrome
+npm run test:e2e  # Playwright tests in real Chrome and Firefox
 npm run lint      # biome check
 npm run example   # serves the repo and opens example/index.html
 ```
 
-The e2e suite runs the library in Chrome against loopback servers started
-by the test harness and checks both channels for real. Install the browser
-once with `npx playwright install chromium`. CI runs the suite on Linux
-and lowers the unprivileged port floor so the fetch route for ports below
-1024 is covered; on machines where a low port cannot be bound that single
-test skips itself. Firefox and WebKit projects are present but commented
-out in `playwright.config.js`.
+The e2e suite runs the library in Chrome and Firefox against loopback
+servers started by the test harness. Install the browsers once with
+`npx playwright install chromium firefox`. The loopback ICE specs run on
+Chromium only, since Firefox routes those ports to fetch. CI runs the suite
+on Linux and lowers the unprivileged port floor so the fetch route for ports
+below 1024 is covered; where a low port cannot be bound that test skips
+itself. A WebKit project is present but commented out in
+`playwright.config.js`.

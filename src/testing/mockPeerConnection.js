@@ -1,9 +1,6 @@
 // getStats mirrors the real remote-candidate / candidate-pair split so tests
 // cover the port attribution join.
-export async function withFakePeerConnection(
-	{ requestsSent = 0, remotePort } = {},
-	fn,
-) {
+export async function withFakePeerConnection({ state, remotePort } = {}, fn) {
 	const instances = [];
 	const original = globalThis.RTCPeerConnection;
 
@@ -42,7 +39,7 @@ export async function withFakePeerConnection(
 				{
 					type: "candidate-pair",
 					remoteCandidateId: "cand1",
-					requestsSent,
+					state,
 				},
 			]);
 			return new Map(entries);
