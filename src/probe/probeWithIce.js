@@ -3,7 +3,7 @@ import { PortState } from "./probeWithFetch.js";
 const POLL_INTERVAL_MS = 100;
 
 // There is no second peer: the answer is forged to plant one passive ICE-TCP
-// candidate per target port. libwebrtc rejects candidates to ports < 1024 on
+// candidate per target port. Browsers reject ICE candidates to ports < 1024 on
 // local addresses, which is why batch.js sends those through fetch.
 function buildAnswerSdp({ mid, host, ports }) {
 	const lines = [
@@ -41,8 +41,11 @@ async function startChecks(host, ports) {
 	return connection;
 }
 
-// A pair only proves the port is open once it has sent STUN traffic
-// (requestsSent > 0); pairs exist before any connectivity check runs.
+// A pair proves the port open once its check is in flight. Chromium leaves a
+// refused port with no pair; Firefox leaves one in "failed". requestsSent is
+// Chromium-only, so key on state, which both engines populate.
+const CONNECTED_PAIR_STATES = new Set(["in-progress", "succeeded"]);
+
 async function collectReachablePorts(connection, reachable) {
 	const stats = await connection.getStats();
 	const remotePorts = new Map();
@@ -50,7 +53,10 @@ async function collectReachablePorts(connection, reachable) {
 	for (const report of stats.values()) {
 		if (report.type === "remote-candidate") {
 			remotePorts.set(report.id, report.port);
-		} else if (report.type === "candidate-pair" && report.requestsSent > 0) {
+		} else if (
+			report.type === "candidate-pair" &&
+			CONNECTED_PAIR_STATES.has(report.state)
+		) {
 			pairs.push(report);
 		}
 	}
@@ -62,7 +68,7 @@ async function collectReachablePorts(connection, reachable) {
 	}
 }
 
-// libwebrtc paces ICE-TCP checks at ~65 ms per candidate per connection, so the
+// Browsers pace ICE-TCP checks (~65 ms per candidate on Chromium), so the
 // deadline must grow with batch size or late-checked open ports look closed.
 const adaptiveTimeoutMs = (portCount) => portCount * 100 + 500;
 

@@ -4,6 +4,11 @@ import { expect, test } from "./fixtures.js";
 const ICE_TIMEOUT_MS = 4000;
 
 test.describe("ICE channel", () => {
+	// Loopback ICE is Chromium-only; other engines route these ports to fetch.
+	test.beforeEach(({ browserName }) => {
+		test.skip(browserName !== "chromium", "loopback ICE is Chromium-only");
+	});
+
 	test("accepted TCP connection on loopback → open", async ({
 		probeApi,
 		servers,

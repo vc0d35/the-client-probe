@@ -43,11 +43,11 @@ test("probeBatches routes low ports to fetch and high ports to ICE", async () =>
 		},
 		async () => {
 			await withFakePeerConnection(
-				{ requestsSent: 1, remotePort: 8080 },
+				{ state: "in-progress", remotePort: 8080 },
 				async () => {
-					const results = await probeBatches("127.0.0.1", [80, 8080]);
+					const results = await probeBatches("10.0.0.5", [80, 8080]);
 
-					assert.deepEqual(fetchUrls, ["http://127.0.0.1:80/"]);
+					assert.deepEqual(fetchUrls, ["http://10.0.0.5:80/"]);
 					assert.deepEqual(
 						results.map(({ port, state }) => ({ port, state })),
 						[
@@ -56,6 +56,35 @@ test("probeBatches routes low ports to fetch and high ports to ICE", async () =>
 						],
 					);
 				},
+			);
+		},
+	);
+});
+
+test("probeBatches sends loopback high ports to fetch off Chromium", async () => {
+	const fetchUrls = [];
+
+	await withMockFetch(
+		async (url) => {
+			fetchUrls.push(url);
+			return {};
+		},
+		async () => {
+			// Node reports as non-Chromium, so a loopback high port must use fetch;
+			// routing it to ICE would call RTCPeerConnection and throw. Real Chromium
+			// keeps ICE for loopback — covered by the e2e suite.
+			const results = await probeBatches("127.0.0.1", [80, 8080]);
+
+			assert.deepEqual(fetchUrls.sort(), [
+				"http://127.0.0.1:80/",
+				"http://127.0.0.1:8080/",
+			]);
+			assert.deepEqual(
+				results.map(({ port, state }) => ({ port, state })),
+				[
+					{ port: 80, state: PortState.Open },
+					{ port: 8080, state: PortState.Open },
+				],
 			);
 		},
 	);
@@ -71,19 +100,15 @@ test("probeBatches reports restricted ports without probing them", async () => {
 		},
 		async () => {
 			await withFakePeerConnection(
-				{ requestsSent: 1, remotePort: 8080 },
+				{ state: "in-progress", remotePort: 8080 },
 				async (instances) => {
 					const events = [];
-					const results = await probeBatches(
-						"127.0.0.1",
-						[22, 80, 6000, 8080],
-						{
-							onProgress: (progress) => events.push(progress),
-						},
-					);
+					const results = await probeBatches("10.0.0.5", [22, 80, 6000, 8080], {
+						onProgress: (progress) => events.push(progress),
+					});
 
 					assert.equal(events.at(-1).completed, 4);
-					assert.deepEqual(fetchUrls, ["http://127.0.0.1:80/"]);
+					assert.deepEqual(fetchUrls, ["http://10.0.0.5:80/"]);
 					assert.deepEqual(
 						results.map(({ port, state }) => ({ port, state })),
 						[
@@ -104,9 +129,9 @@ test("probeBatches reports restricted ports without probing them", async () => {
 
 test("probeBatches shares one connection per ICE batch", async () => {
 	await withFakePeerConnection(
-		{ requestsSent: 1, remotePort: 8080 },
+		{ state: "in-progress", remotePort: 8080 },
 		async (instances) => {
-			const results = await probeBatches("127.0.0.1", [8080, 8081], {
+			const results = await probeBatches("10.0.0.5", [8080, 8081], {
 				iceTimeoutMs: 300,
 			});
 
@@ -129,9 +154,9 @@ test("probeBatches reports progress for every probe", async () => {
 		async () => ({}),
 		async () => {
 			await withFakePeerConnection(
-				{ requestsSent: 1, remotePort: 8080 },
+				{ state: "in-progress", remotePort: 8080 },
 				async () => {
-					await probeBatches("127.0.0.1", [80, 443, 8080], {
+					await probeBatches("10.0.0.5", [80, 443, 8080], {
 						onProgress: (progress) => events.push(progress),
 					});
 

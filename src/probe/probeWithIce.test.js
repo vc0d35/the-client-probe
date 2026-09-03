@@ -6,7 +6,7 @@ import { withFakePeerConnection } from "../testing/mockPeerConnection.js";
 
 test("probeWithIce classifies candidate-pair traffic as open", async () => {
 	await withFakePeerConnection(
-		{ requestsSent: 1, remotePort: 8080 },
+		{ state: "in-progress", remotePort: 8080 },
 		async (instances) => {
 			const result = await probeWithIce("127.0.0.1", 8080);
 
@@ -25,11 +25,14 @@ test("probeWithIce classifies candidate-pair traffic as open", async () => {
 	);
 });
 
-test("probeWithIce classifies no traffic as closed", async () => {
-	await withFakePeerConnection({ requestsSent: 0 }, async () => {
-		const result = await probeWithIce("127.0.0.1", 8080);
+test("probeWithIce classifies a failed candidate-pair as closed", async () => {
+	await withFakePeerConnection(
+		{ state: "failed", remotePort: 8080 },
+		async () => {
+			const result = await probeWithIce("127.0.0.1", 8080);
 
-		assert.equal(result.state, PortState.Closed);
-		assert.ok(result.durationMs >= 600, "waits out the adaptive timeout");
-	});
+			assert.equal(result.state, PortState.Closed);
+			assert.ok(result.durationMs >= 600, "waits out the adaptive timeout");
+		},
+	);
 });

@@ -31,7 +31,7 @@ jobs:
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox
 
       # Let the e2e suite bind ports < 1024 so the fetch route runs instead of skipping.
       - run: sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1
